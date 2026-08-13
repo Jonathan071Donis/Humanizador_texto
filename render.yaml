@@ -6,8 +6,6 @@ services:
     region: oregon
     healthCheckPath: /health
     envVars:
-      - key: SECRET_KEY
-        generateValue: true
       - key: APP_NAME
         value: Watermark Detector
       - key: CORS_ORIGINS
@@ -18,10 +16,6 @@ services:
         value: "50"
       - key: RATE_LIMIT_PER_MINUTE
         value: "10"
-      - key: COOKIE_SECURE
-        value: "true"
-      - key: TOKEN_TTL_SECONDS
-        value: "28800"
       - key: WEB_CONCURRENCY
         value: "2"
       - key: PORT

@@ -7,16 +7,25 @@
 
   <div class="row g-4">
     <div class="col-lg-5">
-      <div class="wm-panel">
+      <div class="wm-panel mb-4">
+        <div class="wm-panel-header">
+          <span class="wm-panel-icon"><i class="bi bi-stack"></i></span>
+          <h2 class="wm-panel-title">Archivos</h2>
+        </div>
         <div id="batchDropZone" class="wm-dropzone">
-          <p class="mb-1">Arrastra varios archivos aqu&iacute;</p>
+          <i class="bi bi-cloud-arrow-up fs-3 wm-muted"></i>
+          <p class="mb-1 mt-2">Arrastra varios archivos aqu&iacute;</p>
           <p class="wm-muted small mb-3">o selecci&oacute;nalos manualmente</p>
           <input type="file" id="batchFileInput" class="form-control wm-input" multiple>
         </div>
         <div id="batchFileList" class="wm-muted small mt-2"></div>
+      </div>
 
-        <hr class="wm-hr">
-        <h3 class="h6">Configuraci&oacute;n de detecci&oacute;n</h3>
+      <div class="wm-panel">
+        <div class="wm-panel-header">
+          <span class="wm-panel-icon wm-panel-icon-teal"><i class="bi bi-sliders"></i></span>
+          <h2 class="wm-panel-title">Configuraci&oacute;n de detecci&oacute;n</h2>
+        </div>
         <div class="mb-3">
           <label class="form-label">Palabras / frases clave (separadas por coma)</label>
           <input type="text" id="batchKeywordsInput" class="form-control wm-input" placeholder="marca-agua-x, confidencial...">
@@ -35,7 +44,10 @@
             <label class="form-check-label wm-muted" for="batchDetectInvisible">Invisibles</label>
           </div>
         </div>
-        <button id="btnBatchAnalyze" class="btn wm-btn-accent w-100">Analizar lote</button>
+        <button id="btnBatchAnalyze" class="btn wm-btn-accent w-100 d-flex align-items-center justify-content-center gap-2">
+          <span id="btnBatchSpinner" class="spinner-border wm-spinner d-none" role="status" aria-hidden="true"></span>
+          <span id="btnBatchLabel"><i class="bi bi-play-fill me-1"></i>Analizar lote</span>
+        </button>
         <div class="wm-progress-wrap mt-3 d-none" id="batchProgressWrap">
           <div class="progress wm-progress">
             <div id="batchProgressBar" class="progress-bar" style="width:0%"></div>
@@ -48,8 +60,11 @@
     <div class="col-lg-7">
       <div class="wm-panel">
         <div class="d-flex justify-content-between align-items-center mb-3">
-          <h3 class="h6 mb-0">Resultados</h3>
-          <button id="btnBatchDownloadZip" class="btn wm-btn-accent btn-sm d-none">Descargar todo (ZIP)</button>
+          <div class="wm-panel-header mb-0">
+            <span class="wm-panel-icon"><i class="bi bi-list-check"></i></span>
+            <h2 class="wm-panel-title">Resultados</h2>
+          </div>
+          <button id="btnBatchDownloadZip" class="btn wm-btn-accent btn-sm d-none"><i class="bi bi-file-zip me-1"></i>Descargar todo (ZIP)</button>
         </div>
         <div class="table-responsive">
           <table class="table table-dark table-hover wm-table align-middle mb-0">

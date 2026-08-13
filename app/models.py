@@ -1,31 +1,11 @@
 """
-Pydantic models used across the API. No database - these are pure
-in-memory / wire-format schemas.
+Pydantic models used across the API. No database, no accounts - these are
+pure in-memory / wire-format schemas.
 """
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Literal, Optional
 from pydantic import BaseModel, Field
-
-
-# ---------------------------------------------------------------------------
-# Auth
-# ---------------------------------------------------------------------------
-
-class RegisterRequest(BaseModel):
-    username: str = Field(..., min_length=3, max_length=32)
-    password: str = Field(..., min_length=6, max_length=128)
-
-
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    username: str
 
 
 # ---------------------------------------------------------------------------
@@ -67,6 +47,17 @@ class KeywordMatch(BaseModel):
     column: int
 
 
+class AIScoreResult(BaseModel):
+    """Heuristic, non-ML estimate of how likely a text is to be AI-generated.
+
+    Purely statistical/informational - not a trained classifier and not a
+    verdict. See ai_score.py for the signals used and their weights.
+    """
+    score: float                # 0-100, higher = more heuristic signals of AI-generated style
+    signals: List[str]          # human-readable explanation of what triggered the score
+    disclaimer: str
+
+
 class DetectionResult(BaseModel):
     filename: str
     file_type: str
@@ -76,6 +67,7 @@ class DetectionResult(BaseModel):
     total_findings: int
     clean: bool
     extracted_text: str
+    ai_score: Optional[AIScoreResult] = None
     error: Optional[str] = None
 
 
@@ -101,3 +93,19 @@ class BatchFileResult(BaseModel):
     status: str  # "ok" | "error"
     detection: Optional[DetectionResult] = None
     message: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Text humanization (optional, off by default, purely stylistic - see
+# humanize.py for the scope and ethical limits of this feature)
+# ---------------------------------------------------------------------------
+
+class HumanizeRequest(BaseModel):
+    text: str = Field(..., min_length=1)
+    intensity: Literal["low", "medium", "high"] = "medium"
+
+
+class HumanizeResponse(BaseModel):
+    original: str
+    humanized: str
+    changes: List[str]

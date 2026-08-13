@@ -4,6 +4,7 @@
     content: '',
     detection: null,
   };
+  let humanizedText = '';
 
   const pasteArea = document.getElementById('pasteArea');
   const pasteFilename = document.getElementById('pasteFilename');
@@ -15,8 +16,11 @@
   const caseSensitive = document.getElementById('caseSensitive');
   const detectInvisible = document.getElementById('detectInvisible');
   const btnAnalyze = document.getElementById('btnAnalyze');
+  const btnAnalyzeSpinner = document.getElementById('btnAnalyzeSpinner');
+  const btnAnalyzeLabel = document.getElementById('btnAnalyzeLabel');
   const analyzeError = document.getElementById('analyzeError');
 
+  const loadingSkeleton = document.getElementById('loadingSkeleton');
   const resultsWrap = document.getElementById('resultsWrap');
   const emptyState = document.getElementById('emptyState');
   const resultFilename = document.getElementById('resultFilename');
@@ -28,6 +32,19 @@
   const diffWrap = document.getElementById('diffWrap');
   const diffPreview = document.getElementById('diffPreview');
   const btnDownload = document.getElementById('btnDownload');
+
+  const aiScoreValue = document.getElementById('aiScoreValue');
+  const aiScoreMeter = document.getElementById('aiScoreMeter');
+  const aiScoreSignals = document.getElementById('aiScoreSignals');
+
+  const humanizeToggle = document.getElementById('humanizeToggle');
+  const humanizeIntensity = document.getElementById('humanizeIntensity');
+  const humanizeWrap = document.getElementById('humanizeWrap');
+  const humanizeLoading = document.getElementById('humanizeLoading');
+  const humanizeOriginal = document.getElementById('humanizeOriginal');
+  const humanizeResult = document.getElementById('humanizeResult');
+  const humanizeChanges = document.getElementById('humanizeChanges');
+  const btnCopyHumanized = document.getElementById('btnCopyHumanized');
 
   let activeTab = 'paste';
   document.querySelectorAll('#sourceTabs button').forEach((btn) => {
@@ -64,6 +81,18 @@
     }
   });
 
+  // Editing the source text invalidates any humanized preview - reset it
+  // so the user never sees a humanized version out of sync with the input.
+  pasteArea.addEventListener('input', resetHumanizeState);
+
+  function resetHumanizeState() {
+    humanizeToggle.checked = false;
+    humanizeIntensity.disabled = true;
+    humanizeWrap.classList.add('d-none');
+    humanizeLoading.classList.add('d-none');
+    humanizedText = '';
+  }
+
   function currentConfig() {
     return {
       keywords: keywordsInput.value.split(',').map((k) => k.trim()).filter(Boolean),
@@ -73,10 +102,24 @@
     };
   }
 
+  function setAnalyzing(isAnalyzing) {
+    btnAnalyze.disabled = isAnalyzing;
+    btnAnalyzeSpinner.classList.toggle('d-none', !isAnalyzing);
+    btnAnalyzeLabel.innerHTML = isAnalyzing
+      ? 'Analizando&hellip;'
+      : '<i class="bi bi-search me-1"></i>Analizar';
+    if (isAnalyzing) {
+      emptyState.classList.add('d-none');
+      resultsWrap.classList.add('d-none');
+      loadingSkeleton.classList.remove('d-none');
+    } else {
+      loadingSkeleton.classList.add('d-none');
+    }
+  }
+
   async function analyze() {
     analyzeError.classList.add('d-none');
-    btnAnalyze.disabled = true;
-    btnAnalyze.textContent = 'Analizando...';
+    setAnalyzing(true);
     try {
       let result;
       if (activeTab === 'paste') {
@@ -106,13 +149,15 @@
       state.filename = result.filename;
       state.content = result.extracted_text;
       state.detection = result;
+      resetHumanizeState();
       renderResults(result);
     } catch (err) {
+      loadingSkeleton.classList.add('d-none');
+      emptyState.classList.remove('d-none');
       analyzeError.textContent = err.message || 'Error inesperado';
       analyzeError.classList.remove('d-none');
     } finally {
-      btnAnalyze.disabled = false;
-      btnAnalyze.textContent = 'Analizar';
+      setAnalyzing(false);
     }
   }
 
@@ -122,14 +167,16 @@
     diffWrap.classList.add('d-none');
 
     resultFilename.textContent = result.filename;
-    resultMeta.textContent = `${result.file_type.toUpperCase()} \u00b7 ${result.original_length} caracteres`;
+    resultMeta.textContent = `${result.file_type.toUpperCase()} · ${result.original_length} caracteres`;
     if (result.clean) {
-      resultBadge.textContent = 'sin marcas detectadas';
+      resultBadge.innerHTML = '<i class="bi bi-check-circle"></i> sin marcas detectadas';
       resultBadge.className = 'wm-tag wm-tag-clean';
     } else {
-      resultBadge.textContent = `${result.total_findings} hallazgo(s)`;
+      resultBadge.innerHTML = `<i class="bi bi-exclamation-triangle"></i> ${result.total_findings} hallazgo(s)`;
       resultBadge.className = 'wm-tag wm-tag-found';
     }
+
+    renderAiScore(result.ai_score);
 
     findingsList.innerHTML = '';
     if (result.total_findings === 0) {
@@ -137,13 +184,30 @@
     }
     result.invisible_chars.forEach((m) => {
       findingsList.appendChild(
-        findingRow(m.id, 'invisible', `${m.codepoint} \u2014 ${m.name}`, `l\u00ednea ${m.line}, col ${m.column}`)
+        findingRow(m.id, 'invisible', `${m.codepoint} — ${m.name}`, `línea ${m.line}, col ${m.column}`)
       );
     });
     result.keyword_matches.forEach((m) => {
       findingsList.appendChild(
-        findingRow(m.id, 'keyword', `"${escapeHtml(m.matched_text)}"`, `l\u00ednea ${m.line}, col ${m.column} \u00b7 patr\u00f3n: ${escapeHtml(m.keyword)}`)
+        findingRow(m.id, 'keyword', `"${escapeHtml(m.matched_text)}"`, `línea ${m.line}, col ${m.column} · patrón: ${escapeHtml(m.keyword)}`)
       );
+    });
+  }
+
+  function renderAiScore(aiScore) {
+    if (!aiScore) {
+      aiScoreValue.textContent = '—';
+      aiScoreMeter.style.width = '0%';
+      aiScoreSignals.innerHTML = '';
+      return;
+    }
+    aiScoreValue.textContent = `${aiScore.score}%`;
+    aiScoreMeter.style.width = `${Math.min(100, Math.max(0, aiScore.score))}%`;
+    aiScoreSignals.innerHTML = '';
+    aiScore.signals.forEach((signal) => {
+      const li = document.createElement('li');
+      li.innerHTML = `<i class="bi bi-dot"></i><span>${escapeHtml(signal)}</span>`;
+      aiScoreSignals.appendChild(li);
     });
   }
 
@@ -187,6 +251,61 @@
     diffWrap.classList.remove('d-none');
     diffPreview.innerHTML = result.diff_html || '<span class="wm-muted">Sin cambios.</span>';
   }
+
+  async function runHumanize() {
+    if (!state.content.trim()) return;
+    humanizeWrap.classList.add('d-none');
+    humanizeLoading.classList.remove('d-none');
+    try {
+      const res = await fetch('/api/humanize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: state.content, intensity: humanizeIntensity.value }),
+      });
+      if (!res.ok) throw new Error((await res.json()).detail || 'Error al generar la versión humanizada');
+      const data = await res.json();
+      humanizedText = data.humanized;
+      humanizeOriginal.textContent = data.original;
+      humanizeResult.textContent = data.humanized;
+      humanizeChanges.innerHTML = '';
+      data.changes.forEach((c) => {
+        const li = document.createElement('li');
+        li.innerHTML = `<i class="bi bi-arrow-right-short"></i><span>${escapeHtml(c)}</span>`;
+        humanizeChanges.appendChild(li);
+      });
+      humanizeWrap.classList.remove('d-none');
+    } catch (err) {
+      humanizeToggle.checked = false;
+      humanizeIntensity.disabled = true;
+      analyzeError.textContent = err.message || 'Error inesperado al humanizar el texto';
+      analyzeError.classList.remove('d-none');
+    } finally {
+      humanizeLoading.classList.add('d-none');
+    }
+  }
+
+  humanizeToggle.addEventListener('change', () => {
+    humanizeIntensity.disabled = !humanizeToggle.checked;
+    if (humanizeToggle.checked) {
+      runHumanize();
+    } else {
+      humanizeWrap.classList.add('d-none');
+    }
+  });
+  humanizeIntensity.addEventListener('change', () => {
+    if (humanizeToggle.checked) runHumanize();
+  });
+  btnCopyHumanized.addEventListener('click', async () => {
+    if (!humanizedText) return;
+    try {
+      await navigator.clipboard.writeText(humanizedText);
+      const original = btnCopyHumanized.innerHTML;
+      btnCopyHumanized.innerHTML = '<i class="bi bi-check2 me-1"></i>Copiado';
+      setTimeout(() => { btnCopyHumanized.innerHTML = original; }, 1500);
+    } catch (err) {
+      // clipboard API unavailable/denied - nothing else we can do here
+    }
+  });
 
   btnAnalyze.addEventListener('click', analyze);
   btnRemoveSelected.addEventListener('click', () => clean(false));

@@ -1,20 +1,20 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="container py-5">
-  <div class="wm-eyebrow">panel de {{ user }}</div>
+  <div class="wm-eyebrow">panel</div>
   <h1 class="mb-4">Tu sesi&oacute;n actual</h1>
 
   <div class="row g-4 mb-4">
     <div class="col-md-6">
       <a href="/process" class="wm-action-card">
-        <div class="wm-feature-icon">&rarr;</div>
+        <div class="wm-feature-icon"><i class="bi bi-search"></i></div>
         <h3>Analizar archivo o texto</h3>
         <p class="wm-muted">Detecta y elimina marcas de agua en un archivo individual.</p>
       </a>
     </div>
     <div class="col-md-6">
       <a href="/batch" class="wm-action-card">
-        <div class="wm-feature-icon">&#9633;&#9633;</div>
+        <div class="wm-feature-icon"><i class="bi bi-stack"></i></div>
         <h3>Procesamiento por lote</h3>
         <p class="wm-muted">Sube hasta 20 archivos y descarga los resultados limpios en ZIP.</p>
       </a>
@@ -30,7 +30,7 @@
         {% for h in history %}
         <tr>
           <td>{{ h.filename }}</td>
-          <td>{% if h.findings > 0 %}<span class="wm-tag wm-tag-found">{{ h.findings }}</span>{% else %}<span class="wm-tag wm-tag-clean">limpio</span>{% endif %}</td>
+          <td>{% if h.findings > 0 %}<span class="wm-tag wm-tag-found"><i class="bi bi-exclamation-triangle"></i> {{ h.findings }}</span>{% else %}<span class="wm-tag wm-tag-clean"><i class="bi bi-check-circle"></i> limpio</span>{% endif %}</td>
           <td class="wm-muted">hace instantes</td>
         </tr>
         {% endfor %}
@@ -38,7 +38,7 @@
     </table>
   </div>
   {% else %}
-  <p class="wm-muted">A&uacute;n no has procesado ning&uacute;n archivo en esta sesi&oacute;n. El historial se guarda solo en memoria y desaparece al cerrar sesi&oacute;n o reiniciar el servidor.</p>
+  <p class="wm-muted">A&uacute;n no has procesado ning&uacute;n archivo en esta sesi&oacute;n. El historial se guarda solo en memoria del servidor (identificada por una cookie an&oacute;nima, sin cuenta) y desaparece al reiniciar el servidor o borrar cookies.</p>
   {% endif %}
 </section>
 {% endblock %}

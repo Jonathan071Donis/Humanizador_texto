@@ -6,10 +6,14 @@
 
   <div class="row g-4">
     <div class="col-lg-5">
-      <div class="wm-panel">
+      <div class="wm-panel mb-4">
+        <div class="wm-panel-header">
+          <span class="wm-panel-icon"><i class="bi bi-file-earmark-text"></i></span>
+          <h2 class="wm-panel-title">Origen del contenido</h2>
+        </div>
         <ul class="nav nav-tabs wm-tabs" id="sourceTabs">
-          <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabPaste">Pegar texto</button></li>
-          <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabFile">Subir archivo</button></li>
+          <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabPaste"><i class="bi bi-clipboard me-1"></i>Pegar texto</button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabFile"><i class="bi bi-upload me-1"></i>Subir archivo</button></li>
         </ul>
         <div class="tab-content pt-3">
           <div class="tab-pane fade show active" id="tabPaste">
@@ -18,21 +22,26 @@
           </div>
           <div class="tab-pane fade" id="tabFile">
             <div id="dropZone" class="wm-dropzone">
-              <p class="mb-1">Arrastra un archivo aqu&iacute;</p>
+              <i class="bi bi-cloud-arrow-up fs-3 wm-muted"></i>
+              <p class="mb-1 mt-2">Arrastra un archivo aqu&iacute;</p>
               <p class="wm-muted small mb-3">.txt .md .py .js .java .cpp .go .rs .php .pdf .docx y m&aacute;s</p>
               <input type="file" id="fileInput" class="form-control wm-input" accept=".txt,.md,.py,.js,.ts,.java,.cpp,.c,.go,.rs,.php,.rb,.cs,.json,.yaml,.yml,.html,.css,.sql,.pdf,.docx">
             </div>
             <div id="fileNamePreview" class="wm-muted small mt-2"></div>
           </div>
         </div>
+      </div>
 
-        <hr class="wm-hr">
-        <h3 class="h6">Configuraci&oacute;n de detecci&oacute;n</h3>
+      <div class="wm-panel mb-4">
+        <div class="wm-panel-header">
+          <span class="wm-panel-icon wm-panel-icon-teal"><i class="bi bi-sliders"></i></span>
+          <h2 class="wm-panel-title">Configuraci&oacute;n de detecci&oacute;n</h2>
+        </div>
         <div class="mb-3">
           <label class="form-label">Palabras / frases clave (separadas por coma)</label>
           <input type="text" id="keywordsInput" class="form-control wm-input" placeholder="marca-agua-x, confidencial, ©2024...">
         </div>
-        <div class="d-flex flex-wrap gap-3 mb-3">
+        <div class="d-flex flex-column gap-2 mb-3">
           <div class="form-check form-switch">
             <input class="form-check-input" type="checkbox" id="useRegex">
             <label class="form-check-label wm-muted" for="useRegex">Usar expresi&oacute;n regular</label>
@@ -46,12 +55,27 @@
             <label class="form-check-label wm-muted" for="detectInvisible">Detectar caracteres invisibles</label>
           </div>
         </div>
-        <button id="btnAnalyze" class="btn wm-btn-accent w-100">Analizar</button>
+        <button id="btnAnalyze" class="btn wm-btn-accent w-100 d-flex align-items-center justify-content-center gap-2">
+          <span id="btnAnalyzeSpinner" class="spinner-border wm-spinner d-none" role="status" aria-hidden="true"></span>
+          <span id="btnAnalyzeLabel"><i class="bi bi-search me-1"></i>Analizar</span>
+        </button>
         <div id="analyzeError" class="wm-alert-error d-none mt-3"></div>
       </div>
     </div>
 
     <div class="col-lg-7">
+      <div id="loadingSkeleton" class="d-none">
+        <div class="wm-panel mb-3">
+          <div class="wm-skeleton wm-skeleton-line" style="width:40%"></div>
+          <div class="wm-skeleton wm-skeleton-badge"></div>
+        </div>
+        <div class="wm-panel mb-3">
+          <div class="wm-skeleton wm-skeleton-line"></div>
+          <div class="wm-skeleton wm-skeleton-line"></div>
+          <div class="wm-skeleton wm-skeleton-line"></div>
+        </div>
+      </div>
+
       <div id="resultsWrap" class="d-none">
         <div class="wm-panel mb-3">
           <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -64,22 +88,87 @@
         </div>
 
         <div class="wm-panel mb-3">
-          <h3 class="h6 mb-3">Hallazgos</h3>
+          <div class="wm-panel-header">
+            <span class="wm-panel-icon"><i class="bi bi-robot"></i></span>
+            <h2 class="wm-panel-title">Probabilidad de texto generado por IA</h2>
+          </div>
+          <div class="d-flex align-items-center gap-3 flex-wrap">
+            <span class="wm-score-value" id="aiScoreValue">&mdash;</span>
+            <div class="flex-grow-1" style="min-width:160px">
+              <div class="wm-meter"><div id="aiScoreMeter" class="wm-meter-fill" style="width:0%"></div></div>
+            </div>
+          </div>
+          <ul id="aiScoreSignals" class="wm-signals-list"></ul>
+          <div class="wm-disclaimer">
+            <i class="bi bi-info-circle"></i>
+            <span>Estimaci&oacute;n heur&iacute;stica, no concluyente: se basa en el estilo superficial del texto (varianza de longitud de oraciones, diversidad l&eacute;xica, conectores t&iacute;picos y puntuaci&oacute;n), no en un modelo entrenado. No es una herramienta de evasi&oacute;n de detectores.</span>
+          </div>
+        </div>
+
+        <div class="wm-panel mb-3">
+          <div class="wm-panel-header">
+            <span class="wm-panel-icon wm-panel-icon-teal"><i class="bi bi-eye"></i></span>
+            <h2 class="wm-panel-title">Hallazgos</h2>
+          </div>
           <div id="findingsList" class="wm-findings-list"></div>
           <div class="d-flex gap-2 mt-3 flex-wrap">
-            <button id="btnRemoveSelected" class="btn wm-btn-accent btn-sm">Eliminar seleccionados</button>
+            <button id="btnRemoveSelected" class="btn wm-btn-accent btn-sm"><i class="bi bi-eraser me-1"></i>Eliminar seleccionados</button>
             <button id="btnRemoveAll" class="btn wm-btn-outline btn-sm">Eliminar todos</button>
           </div>
         </div>
 
+        <div class="wm-panel mb-3">
+          <div class="wm-panel-header">
+            <span class="wm-panel-icon wm-panel-icon-teal"><i class="bi bi-magic"></i></span>
+            <h2 class="wm-panel-title">Versi&oacute;n humanizada (opcional)</h2>
+          </div>
+          <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" id="humanizeToggle">
+            <label class="form-check-label wm-muted" for="humanizeToggle">Mostrar versi&oacute;n humanizada</label>
+          </div>
+          <div class="d-flex align-items-center gap-2 mb-3">
+            <label class="wm-muted small mb-0" for="humanizeIntensity">Intensidad:</label>
+            <select id="humanizeIntensity" class="form-select form-select-sm wm-input" style="max-width:140px" disabled>
+              <option value="low">Baja</option>
+              <option value="medium" selected>Media</option>
+              <option value="high">Alta</option>
+            </select>
+          </div>
+          <div class="wm-disclaimer mb-3">
+            <i class="bi bi-info-circle"></i>
+            <span>Reescribe el texto con un estilo m&aacute;s natural y variado conservando significado, datos y estructura (&plusmn;10% de longitud). No est&aacute; dise&ntilde;ada para evadir detectores de IA ni de marcas de agua &mdash; el texto original se conserva siempre para comparar.</span>
+          </div>
+          <div id="humanizeWrap" class="d-none">
+            <div class="wm-humanize-columns">
+              <div>
+                <div class="wm-humanize-col-title">Original</div>
+                <div id="humanizeOriginal" class="wm-humanize-text wm-mono"></div>
+              </div>
+              <div>
+                <div class="wm-humanize-col-title">Humanizado <span class="wm-humanize-badge">humanizado</span></div>
+                <div id="humanizeResult" class="wm-humanize-text wm-mono"></div>
+              </div>
+            </div>
+            <ul id="humanizeChanges" class="wm-changes-list"></ul>
+            <button id="btnCopyHumanized" class="btn wm-btn-outline btn-sm mt-3"><i class="bi bi-clipboard-check me-1"></i>Copiar humanizado</button>
+          </div>
+          <div id="humanizeLoading" class="d-none">
+            <div class="wm-skeleton wm-skeleton-line"></div>
+            <div class="wm-skeleton wm-skeleton-line"></div>
+          </div>
+        </div>
+
         <div id="diffWrap" class="wm-panel d-none">
-          <h3 class="h6 mb-3">Vista previa (antes / despu&eacute;s)</h3>
+          <div class="wm-panel-header">
+            <span class="wm-panel-icon"><i class="bi bi-file-diff"></i></span>
+            <h2 class="wm-panel-title">Vista previa (antes / despu&eacute;s)</h2>
+          </div>
           <pre id="diffPreview" class="wm-diff-preview wm-mono"></pre>
-          <button id="btnDownload" class="btn wm-btn-accent btn-sm mt-3">Descargar archivo limpio</button>
+          <button id="btnDownload" class="btn wm-btn-accent btn-sm mt-3"><i class="bi bi-download me-1"></i>Descargar archivo limpio</button>
         </div>
       </div>
       <div id="emptyState" class="wm-panel wm-empty-state">
-        <p class="wm-muted mb-0">Los resultados del an&aacute;lisis aparecer&aacute;n aqu&iacute;.</p>
+        <p class="wm-muted mb-0"><i class="bi bi-arrow-left me-1"></i>Los resultados del an&aacute;lisis aparecer&aacute;n aqu&iacute;.</p>
       </div>
     </div>
   </div>

@@ -9,6 +9,8 @@
   const caseSensitive = document.getElementById('batchCaseSensitive');
   const detectInvisible = document.getElementById('batchDetectInvisible');
   const btnAnalyze = document.getElementById('btnBatchAnalyze');
+  const btnAnalyzeSpinner = document.getElementById('btnBatchSpinner');
+  const btnAnalyzeLabel = document.getElementById('btnBatchLabel');
   const btnZip = document.getElementById('btnBatchDownloadZip');
   const progressWrap = document.getElementById('batchProgressWrap');
   const progressBar = document.getElementById('batchProgressBar');
@@ -81,7 +83,8 @@
       return;
     }
     btnAnalyze.disabled = true;
-    btnAnalyze.textContent = 'Procesando...';
+    btnAnalyzeSpinner.classList.remove('d-none');
+    btnAnalyzeLabel.textContent = 'Procesando…';
     progressWrap.classList.remove('d-none');
     progressBar.style.width = '15%';
     log(`Enviando ${selectedFiles.length} archivo(s) al servidor...`);
@@ -104,7 +107,8 @@
       log(`Error: ${err.message}`);
     } finally {
       btnAnalyze.disabled = false;
-      btnAnalyze.textContent = 'Analizar lote';
+      btnAnalyzeSpinner.classList.add('d-none');
+      btnAnalyzeLabel.innerHTML = '<i class="bi bi-play-fill me-1"></i>Analizar lote';
       setTimeout(() => progressWrap.classList.add('d-none'), 800);
     }
   }
@@ -114,14 +118,14 @@
     results.forEach((r) => {
       const tr = document.createElement('tr');
       if (r.status === 'error') {
-        tr.innerHTML = `<td>${escapeHtml(r.filename)}</td><td><span class="wm-tag wm-tag-found">error</span></td><td class="wm-muted">${escapeHtml(r.message || '')}</td>`;
+        tr.innerHTML = `<td>${escapeHtml(r.filename)}</td><td><span class="wm-tag wm-tag-found"><i class="bi bi-x-circle"></i> error</span></td><td class="wm-muted">${escapeHtml(r.message || '')}</td>`;
         log(`\u2717 ${r.filename}: ${r.message}`);
       } else {
         const d = r.detection;
         const badge = d.clean
-          ? '<span class="wm-tag wm-tag-clean">limpio</span>'
-          : `<span class="wm-tag wm-tag-found">${d.total_findings} hallazgo(s)</span>`;
-        tr.innerHTML = `<td>${escapeHtml(r.filename)}</td><td>ok</td><td>${badge}</td>`;
+          ? '<span class="wm-tag wm-tag-clean"><i class="bi bi-check-circle"></i> limpio</span>'
+          : `<span class="wm-tag wm-tag-found"><i class="bi bi-exclamation-triangle"></i> ${d.total_findings} hallazgo(s)</span>`;
+        tr.innerHTML = `<td>${escapeHtml(r.filename)}</td><td><span class="wm-tag wm-tag-info">ok</span></td><td>${badge}</td>`;
         log(`\u2713 ${r.filename}: ${d.total_findings} hallazgo(s)`);
       }
       resultsBody.appendChild(tr);

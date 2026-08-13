@@ -12,13 +12,8 @@
           romper la sintaxis ni el formato original. Todo en tiempo real, sin guardar nada en disco.
         </p>
         <div class="d-flex gap-3 flex-wrap">
-          {% if user %}
           <a href="/process" class="btn wm-btn-accent btn-lg">Analizar un archivo</a>
           <a href="/batch" class="btn wm-btn-outline btn-lg">Procesar por lote</a>
-          {% else %}
-          <a href="/register" class="btn wm-btn-accent btn-lg">Crear cuenta gratuita</a>
-          <a href="/login" class="btn wm-btn-outline btn-lg">Iniciar sesi&oacute;n</a>
-          {% endif %}
         </div>
       </div>
       <div class="col-lg-6">
@@ -35,25 +30,32 @@
 
 <section class="container py-5">
   <div class="row g-4">
-    <div class="col-md-4">
+    <div class="col-md-6 col-lg-3">
       <div class="wm-feature-card">
         <div class="wm-feature-icon">01</div>
         <h3>Detecci&oacute;n configurable</h3>
         <p class="wm-muted">Palabras clave, coincidencia exacta o expresiones regulares, con o sin distinci&oacute;n de may&uacute;sculas.</p>
       </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-6 col-lg-3">
       <div class="wm-feature-card">
         <div class="wm-feature-icon">02</div>
         <h3>Caracteres invisibles</h3>
         <p class="wm-muted">Localiza espacios de ancho cero, BOM, marcas bidireccionales y caracteres de "tag" Unicode, con su posici&oacute;n exacta.</p>
       </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-6 col-lg-3">
       <div class="wm-feature-card">
         <div class="wm-feature-icon">03</div>
         <h3>Lote y ZIP</h3>
         <p class="wm-muted">Hasta 20 archivos a la vez, con vista previa de diferencias y descarga en un solo ZIP.</p>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+      <div class="wm-feature-card">
+        <div class="wm-feature-icon">04</div>
+        <h3>Probabilidad de IA</h3>
+        <p class="wm-muted">Indicador heur&iacute;stico e informativo &mdash; no concluyente &mdash; de estilo t&iacute;pico de texto generado por IA.</p>
       </div>
     </div>
   </div>

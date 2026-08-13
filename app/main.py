@@ -13,37 +13,36 @@ load_dotenv()
 
 from fastapi import (
     BackgroundTasks,
-    Body,
-    Cookie,
     Depends,
     FastAPI,
     File,
     Form,
     HTTPException,
     Request,
-    Response,
     UploadFile,
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import auth
+from . import ai_score as ai_score_engine
+from . import session
 from .cleaner import clean_and_diff
 from .detector import run_detection
 from .extractors import ExtractionError, extract_content
+from .humanize import humanize_text_with_changes
 from .models import (
+    AIScoreResult,
     BatchFileResult,
     CleanRequest,
     CleanResult,
     DetectionConfig,
     DetectionResult,
-    LoginRequest,
-    RegisterRequest,
+    HumanizeRequest,
+    HumanizeResponse,
     TextProcessRequest,
-    TokenResponse,
 )
 from .rate_limit import RateLimitMiddleware
 
@@ -53,13 +52,12 @@ logger = logging.getLogger("watermark-detector")
 APP_NAME = os.getenv("APP_NAME", "Watermark Detector")
 MAX_BATCH_FILES = int(os.getenv("MAX_BATCH_FILES", "20"))
 MAX_BATCH_TOTAL_MB = int(os.getenv("MAX_BATCH_TOTAL_MB", "50"))
-COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 app = FastAPI(
     title=APP_NAME,
-    description="Detecci\u00f3n y eliminaci\u00f3n de marcas de agua en texto, c\u00f3digo, PDF y Word \u2014 en tiempo real, sin base de datos.",
+    description="Detección y eliminación de marcas de agua en texto, código, PDF y Word — en tiempo real, sin base de datos ni cuentas de usuario.",
     version="1.0.0",
 )
 
@@ -80,130 +78,75 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _set_session_cookie(response: Response, token: str) -> None:
-    response.set_cookie(
-        key="access_token",
-        value=token,
-        httponly=True,
-        secure=COOKIE_SECURE,
-        samesite="lax",
-        max_age=auth.TOKEN_TTL_SECONDS,
-    )
+def _record_history(session_id: str, filename: str, findings: int) -> None:
+    session.record_history(session_id, filename, findings)
+    logger.info("session=%s processed file=%s findings=%s", session_id, filename, findings)
 
 
-def _record_history(username: str, filename: str, findings: int) -> None:
-    entry = {"filename": filename, "findings": findings, "ts": time.time()}
-    auth.USER_HISTORY.setdefault(username, []).append(entry)
-    logger.info("user=%s processed file=%s findings=%s", username, filename, findings)
-
-
-def _detect_text(filename: str, text: str, config: DetectionConfig) -> DetectionResult:
+def _build_detection_result(filename: str, text: str, config: DetectionConfig, file_type: Optional[str] = None) -> DetectionResult:
     invisible, keywords = run_detection(text, config)
+    score = ai_score_engine.score_text(text)
     return DetectionResult(
         filename=filename,
-        file_type=filename.rsplit(".", 1)[-1] if "." in filename else "text",
+        file_type=file_type or (filename.rsplit(".", 1)[-1] if "." in filename else "text"),
         original_length=len(text),
         invisible_chars=invisible,
         keyword_matches=keywords,
         total_findings=len(invisible) + len(keywords),
         clean=(len(invisible) + len(keywords) == 0),
         extracted_text=text,
+        ai_score=AIScoreResult(score=score.score, signals=score.signals, disclaimer=score.disclaimer),
     )
 
 
 # ---------------------------------------------------------------------------
-# Public pages
+# Public pages (no login required - the whole app is public)
 # ---------------------------------------------------------------------------
 
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request, access_token: Optional[str] = Cookie(default=None)):
-    user = auth.get_current_user_optional(access_token)
-    return templates.TemplateResponse("index.html", {"request": request, "app_name": APP_NAME, "user": user})
-
-
-@app.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request, "app_name": APP_NAME})
-
-
-@app.get("/register", response_class=HTMLResponse)
-async def register_page(request: Request):
-    return templates.TemplateResponse("register.html", {"request": request, "app_name": APP_NAME})
+async def index(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request, "app_name": APP_NAME})
 
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "time": time.time(), "users_in_memory": len(auth.USERS)}
+    return {"status": "ok", "time": time.time(), "sessions_in_memory": len(session.SESSION_HISTORY)}
 
-
-# ---------------------------------------------------------------------------
-# Auth API
-# ---------------------------------------------------------------------------
-
-@app.post("/api/auth/register", response_model=TokenResponse)
-async def register(payload: RegisterRequest, response: Response):
-    try:
-        auth.create_user(payload.username, payload.password)
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-
-    token = auth.create_access_token(payload.username)
-    _set_session_cookie(response, token)
-    logger.info("new user registered: %s", payload.username)
-    return TokenResponse(access_token=token, username=payload.username)
-
-
-@app.post("/api/auth/login", response_model=TokenResponse)
-async def login(payload: LoginRequest, response: Response):
-    if not auth.verify_user(payload.username, payload.password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-
-    token = auth.create_access_token(payload.username)
-    _set_session_cookie(response, token)
-    return TokenResponse(access_token=token, username=payload.username)
-
-
-@app.post("/api/auth/logout")
-async def logout(response: Response):
-    response.delete_cookie("access_token")
-    return {"detail": "logged out"}
-
-
-# ---------------------------------------------------------------------------
-# Protected pages
-# ---------------------------------------------------------------------------
 
 @app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard(request: Request, user: str = Depends(auth.get_current_user)):
-    history = auth.USER_HISTORY.get(user, [])
-    prefs = auth.USER_PREFS.get(user, {"favorite_keywords": []})
+async def dashboard(request: Request, session_id: str = Depends(session.get_or_create_session_id)):
+    history = session.get_history(session_id)
     return templates.TemplateResponse(
         "dashboard.html",
-        {"request": request, "app_name": APP_NAME, "user": user, "history": list(reversed(history))[:25], "prefs": prefs},
+        {"request": request, "app_name": APP_NAME, "history": list(reversed(history))[:25]},
     )
 
 
 @app.get("/process", response_class=HTMLResponse)
-async def process_page(request: Request, user: str = Depends(auth.get_current_user)):
-    return templates.TemplateResponse("process.html", {"request": request, "app_name": APP_NAME, "user": user})
+async def process_page(request: Request):
+    return templates.TemplateResponse("process.html", {"request": request, "app_name": APP_NAME})
 
 
 @app.get("/batch", response_class=HTMLResponse)
-async def batch_page(request: Request, user: str = Depends(auth.get_current_user)):
+async def batch_page(request: Request):
     return templates.TemplateResponse(
         "batch.html",
-        {"request": request, "app_name": APP_NAME, "user": user, "max_files": MAX_BATCH_FILES, "max_mb": MAX_BATCH_TOTAL_MB},
+        {"request": request, "app_name": APP_NAME, "max_files": MAX_BATCH_FILES, "max_mb": MAX_BATCH_TOTAL_MB},
     )
 
 
 # ---------------------------------------------------------------------------
-# Detection / cleaning API (protected)
+# Detection / cleaning API - all public, no login required
 # ---------------------------------------------------------------------------
 
 @app.post("/api/detect/text", response_model=DetectionResult)
-async def detect_text(payload: TextProcessRequest, background_tasks: BackgroundTasks, user: str = Depends(auth.get_current_user)):
-    result = _detect_text(payload.filename, payload.content, payload.config)
-    background_tasks.add_task(_record_history, user, payload.filename, result.total_findings)
+async def detect_text(
+    payload: TextProcessRequest,
+    background_tasks: BackgroundTasks,
+    session_id: str = Depends(session.get_or_create_session_id),
+):
+    result = _build_detection_result(payload.filename, payload.content, payload.config)
+    background_tasks.add_task(_record_history, session_id, payload.filename, result.total_findings)
     return result
 
 
@@ -215,7 +158,7 @@ async def detect_file(
     use_regex: bool = Form(False),
     case_sensitive: bool = Form(False),
     detect_invisible_unicode: bool = Form(True),
-    user: str = Depends(auth.get_current_user),
+    session_id: str = Depends(session.get_or_create_session_id),
 ):
     data = await file.read()
     config = DetectionConfig(
@@ -229,23 +172,13 @@ async def detect_file(
     except ExtractionError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-    invisible, kw_matches = run_detection(text, config)
-    result = DetectionResult(
-        filename=file.filename,
-        file_type=file_type,
-        original_length=len(text),
-        invisible_chars=invisible,
-        keyword_matches=kw_matches,
-        total_findings=len(invisible) + len(kw_matches),
-        clean=(len(invisible) + len(kw_matches) == 0),
-        extracted_text=text,
-    )
-    background_tasks.add_task(_record_history, user, file.filename, result.total_findings)
+    result = _build_detection_result(file.filename, text, config, file_type=file_type)
+    background_tasks.add_task(_record_history, session_id, file.filename, result.total_findings)
     return result
 
 
 @app.post("/api/clean", response_model=CleanResult)
-async def clean(payload: CleanRequest, user: str = Depends(auth.get_current_user)):
+async def clean(payload: CleanRequest):
     return clean_and_diff(
         payload.content,
         payload.filename,
@@ -256,7 +189,7 @@ async def clean(payload: CleanRequest, user: str = Depends(auth.get_current_user
 
 
 @app.post("/api/clean/download")
-async def clean_download(payload: CleanRequest, user: str = Depends(auth.get_current_user)):
+async def clean_download(payload: CleanRequest):
     result = clean_and_diff(
         payload.content,
         payload.filename,
@@ -274,7 +207,19 @@ async def clean_download(payload: CleanRequest, user: str = Depends(auth.get_cur
 
 
 # ---------------------------------------------------------------------------
-# Batch API (protected)
+# "Probabilidad de texto generado por IA" - heuristic, informational only
+# ---------------------------------------------------------------------------
+
+@app.post("/api/humanize", response_model=HumanizeResponse)
+async def humanize(payload: HumanizeRequest):
+    if not payload.text.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El texto no puede estar vacío")
+    humanized, changes = humanize_text_with_changes(payload.text, payload.intensity)
+    return HumanizeResponse(original=payload.text, humanized=humanized, changes=changes)
+
+
+# ---------------------------------------------------------------------------
+# Batch API - public, no login required
 # ---------------------------------------------------------------------------
 
 @app.post("/api/batch/detect")
@@ -285,10 +230,10 @@ async def batch_detect(
     use_regex: bool = Form(False),
     case_sensitive: bool = Form(False),
     detect_invisible_unicode: bool = Form(True),
-    user: str = Depends(auth.get_current_user),
+    session_id: str = Depends(session.get_or_create_session_id),
 ):
     if len(files) > MAX_BATCH_FILES:
-        raise HTTPException(status_code=400, detail=f"M\u00e1ximo {MAX_BATCH_FILES} archivos por lote")
+        raise HTTPException(status_code=400, detail=f"Máximo {MAX_BATCH_FILES} archivos por lote")
 
     config = DetectionConfig(
         keywords=[k for k in keywords.split(",") if k.strip()],
@@ -304,23 +249,13 @@ async def batch_detect(
         data = await f.read()
         total_bytes += len(data)
         if total_bytes > MAX_BATCH_TOTAL_MB * 1024 * 1024:
-            results.append(BatchFileResult(filename=f.filename, status="error", message="L\u00edmite de tama\u00f1o de lote excedido"))
+            results.append(BatchFileResult(filename=f.filename, status="error", message="Límite de tamaño de lote excedido"))
             continue
         try:
             text, file_type = extract_content(f.filename, data)
-            invisible, kw_matches = run_detection(text, config)
-            detection = DetectionResult(
-                filename=f.filename,
-                file_type=file_type,
-                original_length=len(text),
-                invisible_chars=invisible,
-                keyword_matches=kw_matches,
-                total_findings=len(invisible) + len(kw_matches),
-                clean=(len(invisible) + len(kw_matches) == 0),
-                extracted_text=text,
-            )
+            detection = _build_detection_result(f.filename, text, config, file_type=file_type)
             results.append(BatchFileResult(filename=f.filename, status="ok", detection=detection))
-            background_tasks.add_task(_record_history, user, f.filename, detection.total_findings)
+            background_tasks.add_task(_record_history, session_id, f.filename, detection.total_findings)
         except ExtractionError as e:
             results.append(BatchFileResult(filename=f.filename, status="error", message=str(e)))
         except Exception as e:
@@ -337,10 +272,9 @@ async def batch_clean_zip(
     use_regex: bool = Form(False),
     case_sensitive: bool = Form(False),
     detect_invisible_unicode: bool = Form(True),
-    user: str = Depends(auth.get_current_user),
 ):
     if len(files) > MAX_BATCH_FILES:
-        raise HTTPException(status_code=400, detail=f"M\u00e1ximo {MAX_BATCH_FILES} archivos por lote")
+        raise HTTPException(status_code=400, detail=f"Máximo {MAX_BATCH_FILES} archivos por lote")
 
     config = DetectionConfig(
         keywords=[k for k in keywords.split(",") if k.strip()],
@@ -366,21 +300,6 @@ async def batch_clean_zip(
         media_type="application/zip",
         headers={"Content-Disposition": 'attachment; filename="cleaned_files.zip"'},
     )
-
-
-# ---------------------------------------------------------------------------
-# User preferences (favorite keywords) - in-memory per session
-# ---------------------------------------------------------------------------
-
-@app.post("/api/prefs/keywords")
-async def save_favorite_keywords(keywords: List[str] = Body(...), user: str = Depends(auth.get_current_user)):
-    auth.USER_PREFS.setdefault(user, {"favorite_keywords": []})["favorite_keywords"] = keywords
-    return {"favorite_keywords": keywords}
-
-
-@app.get("/api/prefs/keywords")
-async def get_favorite_keywords(user: str = Depends(auth.get_current_user)):
-    return {"favorite_keywords": auth.USER_PREFS.get(user, {}).get("favorite_keywords", [])}
 
 
 if __name__ == "__main__":
