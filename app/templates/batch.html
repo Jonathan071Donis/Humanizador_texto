@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="container py-5">
+  <div class="wm-eyebrow">procesamiento por lote</div>
+  <h1 class="mb-2">Analizar m&uacute;ltiples archivos</h1>
+  <p class="wm-muted mb-4">M&aacute;ximo {{ max_files }} archivos, {{ max_mb }}&nbsp;MB en total.</p>
+
+  <div class="row g-4">
+    <div class="col-lg-5">
+      <div class="wm-panel">
+        <div id="batchDropZone" class="wm-dropzone">
+          <p class="mb-1">Arrastra varios archivos aqu&iacute;</p>
+          <p class="wm-muted small mb-3">o selecci&oacute;nalos manualmente</p>
+          <input type="file" id="batchFileInput" class="form-control wm-input" multiple>
+        </div>
+        <div id="batchFileList" class="wm-muted small mt-2"></div>
+
+        <hr class="wm-hr">
+        <h3 class="h6">Configuraci&oacute;n de detecci&oacute;n</h3>
+        <div class="mb-3">
+          <label class="form-label">Palabras / frases clave (separadas por coma)</label>
+          <input type="text" id="batchKeywordsInput" class="form-control wm-input" placeholder="marca-agua-x, confidencial...">
+        </div>
+        <div class="d-flex flex-wrap gap-3 mb-3">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="batchUseRegex">
+            <label class="form-check-label wm-muted" for="batchUseRegex">Regex</label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="batchCaseSensitive">
+            <label class="form-check-label wm-muted" for="batchCaseSensitive">May&uacute;sculas</label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="batchDetectInvisible" checked>
+            <label class="form-check-label wm-muted" for="batchDetectInvisible">Invisibles</label>
+          </div>
+        </div>
+        <button id="btnBatchAnalyze" class="btn wm-btn-accent w-100">Analizar lote</button>
+        <div class="wm-progress-wrap mt-3 d-none" id="batchProgressWrap">
+          <div class="progress wm-progress">
+            <div id="batchProgressBar" class="progress-bar" style="width:0%"></div>
+          </div>
+        </div>
+        <div id="batchError" class="wm-alert-error d-none mt-3"></div>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div class="wm-panel">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h3 class="h6 mb-0">Resultados</h3>
+          <button id="btnBatchDownloadZip" class="btn wm-btn-accent btn-sm d-none">Descargar todo (ZIP)</button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-dark table-hover wm-table align-middle mb-0">
+            <thead><tr><th>Archivo</th><th>Estado</th><th>Hallazgos</th></tr></thead>
+            <tbody id="batchResultsBody">
+              <tr><td colspan="3" class="wm-muted">A&uacute;n no hay resultados.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="batchLog" class="wm-log wm-mono mt-3"></div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/batch.js"></script>
+{% endblock %}

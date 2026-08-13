@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="container py-5">
+  <div class="wm-eyebrow">panel de {{ user }}</div>
+  <h1 class="mb-4">Tu sesi&oacute;n actual</h1>
+
+  <div class="row g-4 mb-4">
+    <div class="col-md-6">
+      <a href="/process" class="wm-action-card">
+        <div class="wm-feature-icon">&rarr;</div>
+        <h3>Analizar archivo o texto</h3>
+        <p class="wm-muted">Detecta y elimina marcas de agua en un archivo individual.</p>
+      </a>
+    </div>
+    <div class="col-md-6">
+      <a href="/batch" class="wm-action-card">
+        <div class="wm-feature-icon">&#9633;&#9633;</div>
+        <h3>Procesamiento por lote</h3>
+        <p class="wm-muted">Sube hasta 20 archivos y descarga los resultados limpios en ZIP.</p>
+      </a>
+    </div>
+  </div>
+
+  <h2 class="h4 mb-3">Historial de esta sesi&oacute;n</h2>
+  {% if history %}
+  <div class="table-responsive wm-table-wrap">
+    <table class="table table-dark table-hover wm-table align-middle mb-0">
+      <thead><tr><th>Archivo</th><th>Hallazgos</th><th>Momento</th></tr></thead>
+      <tbody>
+        {% for h in history %}
+        <tr>
+          <td>{{ h.filename }}</td>
+          <td>{% if h.findings > 0 %}<span class="wm-tag wm-tag-found">{{ h.findings }}</span>{% else %}<span class="wm-tag wm-tag-clean">limpio</span>{% endif %}</td>
+          <td class="wm-muted">hace instantes</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="wm-muted">A&uacute;n no has procesado ning&uacute;n archivo en esta sesi&oacute;n. El historial se guarda solo en memoria y desaparece al cerrar sesi&oacute;n o reiniciar el servidor.</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="wm-hero">
+  <div class="container py-5">
+    <div class="row align-items-center gy-5">
+      <div class="col-lg-6">
+        <div class="wm-eyebrow">detecci&oacute;n de marcas ocultas</div>
+        <h1 class="wm-display">Encuentra lo que el texto<br>no te muestra.</h1>
+        <p class="wm-lede">
+          Analiza texto, c&oacute;digo, PDF y Word en busca de marcas de agua visibles e invisibles &mdash;
+          espacios de ancho cero, marcas bidireccionales, caracteres de control &mdash; y elim&iacute;nalas sin
+          romper la sintaxis ni el formato original. Todo en tiempo real, sin guardar nada en disco.
+        </p>
+        <div class="d-flex gap-3 flex-wrap">
+          {% if user %}
+          <a href="/process" class="btn wm-btn-accent btn-lg">Analizar un archivo</a>
+          <a href="/batch" class="btn wm-btn-outline btn-lg">Procesar por lote</a>
+          {% else %}
+          <a href="/register" class="btn wm-btn-accent btn-lg">Crear cuenta gratuita</a>
+          <a href="/login" class="btn wm-btn-outline btn-lg">Iniciar sesi&oacute;n</a>
+          {% endif %}
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="wm-scan-panel">
+          <div class="wm-scan-row"><span class="wm-scan-pos">0x01A2</span><span class="wm-scan-cp">U+200B</span><span class="wm-scan-name">ZERO WIDTH SPACE</span><span class="wm-tag wm-tag-found">detectado</span></div>
+          <div class="wm-scan-row"><span class="wm-scan-pos">0x01B7</span><span class="wm-scan-cp">U+FEFF</span><span class="wm-scan-name">BOM</span><span class="wm-tag wm-tag-found">detectado</span></div>
+          <div class="wm-scan-row"><span class="wm-scan-pos">0x0230</span><span class="wm-scan-cp">U+2062</span><span class="wm-scan-name">INVISIBLE TIMES</span><span class="wm-tag wm-tag-found">detectado</span></div>
+          <div class="wm-scan-row wm-scan-clean"><span class="wm-scan-pos">0x0244</span><span class="wm-scan-cp">&mdash;</span><span class="wm-scan-name">contenido limpio</span><span class="wm-tag wm-tag-clean">ok</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="container py-5">
+  <div class="row g-4">
+    <div class="col-md-4">
+      <div class="wm-feature-card">
+        <div class="wm-feature-icon">01</div>
+        <h3>Detecci&oacute;n configurable</h3>
+        <p class="wm-muted">Palabras clave, coincidencia exacta o expresiones regulares, con o sin distinci&oacute;n de may&uacute;sculas.</p>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="wm-feature-card">
+        <div class="wm-feature-icon">02</div>
+        <h3>Caracteres invisibles</h3>
+        <p class="wm-muted">Localiza espacios de ancho cero, BOM, marcas bidireccionales y caracteres de "tag" Unicode, con su posici&oacute;n exacta.</p>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="wm-feature-card">
+        <div class="wm-feature-icon">03</div>
+        <h3>Lote y ZIP</h3>
+        <p class="wm-muted">Hasta 20 archivos a la vez, con vista previa de diferencias y descarga en un solo ZIP.</p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

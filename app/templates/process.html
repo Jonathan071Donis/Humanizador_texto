@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="container py-5">
+  <div class="wm-eyebrow">an&aacute;lisis individual</div>
+  <h1 class="mb-4">Analizar texto o archivo</h1>
+
+  <div class="row g-4">
+    <div class="col-lg-5">
+      <div class="wm-panel">
+        <ul class="nav nav-tabs wm-tabs" id="sourceTabs">
+          <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabPaste">Pegar texto</button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabFile">Subir archivo</button></li>
+        </ul>
+        <div class="tab-content pt-3">
+          <div class="tab-pane fade show active" id="tabPaste">
+            <textarea id="pasteArea" class="form-control wm-input wm-mono" rows="10" placeholder="Pega aqu&iacute; tu texto o c&oacute;digo..."></textarea>
+            <input type="text" id="pasteFilename" class="form-control wm-input mt-2" placeholder="nombre_archivo.txt (opcional)">
+          </div>
+          <div class="tab-pane fade" id="tabFile">
+            <div id="dropZone" class="wm-dropzone">
+              <p class="mb-1">Arrastra un archivo aqu&iacute;</p>
+              <p class="wm-muted small mb-3">.txt .md .py .js .java .cpp .go .rs .php .pdf .docx y m&aacute;s</p>
+              <input type="file" id="fileInput" class="form-control wm-input" accept=".txt,.md,.py,.js,.ts,.java,.cpp,.c,.go,.rs,.php,.rb,.cs,.json,.yaml,.yml,.html,.css,.sql,.pdf,.docx">
+            </div>
+            <div id="fileNamePreview" class="wm-muted small mt-2"></div>
+          </div>
+        </div>
+
+        <hr class="wm-hr">
+        <h3 class="h6">Configuraci&oacute;n de detecci&oacute;n</h3>
+        <div class="mb-3">
+          <label class="form-label">Palabras / frases clave (separadas por coma)</label>
+          <input type="text" id="keywordsInput" class="form-control wm-input" placeholder="marca-agua-x, confidencial, ©2024...">
+        </div>
+        <div class="d-flex flex-wrap gap-3 mb-3">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="useRegex">
+            <label class="form-check-label wm-muted" for="useRegex">Usar expresi&oacute;n regular</label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="caseSensitive">
+            <label class="form-check-label wm-muted" for="caseSensitive">Distinguir may&uacute;sculas/min&uacute;sculas</label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="detectInvisible" checked>
+            <label class="form-check-label wm-muted" for="detectInvisible">Detectar caracteres invisibles</label>
+          </div>
+        </div>
+        <button id="btnAnalyze" class="btn wm-btn-accent w-100">Analizar</button>
+        <div id="analyzeError" class="wm-alert-error d-none mt-3"></div>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div id="resultsWrap" class="d-none">
+        <div class="wm-panel mb-3">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+              <h3 class="h6 mb-1" id="resultFilename"></h3>
+              <span class="wm-muted small" id="resultMeta"></span>
+            </div>
+            <span id="resultBadge" class="wm-tag"></span>
+          </div>
+        </div>
+
+        <div class="wm-panel mb-3">
+          <h3 class="h6 mb-3">Hallazgos</h3>
+          <div id="findingsList" class="wm-findings-list"></div>
+          <div class="d-flex gap-2 mt-3 flex-wrap">
+            <button id="btnRemoveSelected" class="btn wm-btn-accent btn-sm">Eliminar seleccionados</button>
+            <button id="btnRemoveAll" class="btn wm-btn-outline btn-sm">Eliminar todos</button>
+          </div>
+        </div>
+
+        <div id="diffWrap" class="wm-panel d-none">
+          <h3 class="h6 mb-3">Vista previa (antes / despu&eacute;s)</h3>
+          <pre id="diffPreview" class="wm-diff-preview wm-mono"></pre>
+          <button id="btnDownload" class="btn wm-btn-accent btn-sm mt-3">Descargar archivo limpio</button>
+        </div>
+      </div>
+      <div id="emptyState" class="wm-panel wm-empty-state">
+        <p class="wm-muted mb-0">Los resultados del an&aacute;lisis aparecer&aacute;n aqu&iacute;.</p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/process.js"></script>
+{% endblock %}

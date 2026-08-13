@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: watermark-detector
+    env: docker
+    plan: starter
+    region: oregon
+    healthCheckPath: /health
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: APP_NAME
+        value: Watermark Detector
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: MAX_BATCH_FILES
+        value: "20"
+      - key: MAX_BATCH_TOTAL_MB
+        value: "50"
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "10"
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: TOKEN_TTL_SECONDS
+        value: "28800"
+      - key: WEB_CONCURRENCY
+        value: "2"
+      - key: PORT
+        value: "8000"
+    autoDeploy: true
