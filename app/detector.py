@@ -114,6 +114,30 @@ def detect_invisible_unicode(text: str) -> List[InvisibleCharMatch]:
     return findings
 
 
+# use_regex lets an anonymous, unauthenticated caller supply an arbitrary
+# pattern that we compile and run against arbitrary text - textbook ReDoS
+# surface (Python's re has no built-in match timeout, and a catastrophic
+# pattern like (a+)+$ can pin the process for every other request, not just
+# the caller's own rate-limited quota). This is a heuristic denylist for the
+# well-known nested-quantifier shapes, not a full safe-regex analyzer - it
+# catches the common/naive cases; skip (don't crash) on anything that trips it.
+_REDOS_SHAPE_RE = re.compile(
+    r"\([^()]*[+*]\)[+*]"      # (a+)+  (a*)*  (a+)*  (a*)+
+    r"|\([^()]*[+*]\)\{\d*,"   # (a+){2,}
+    r"|(?:\.[+*]){3,}"         # .*.*.*  chained wildcards
+)
+_MAX_REGEX_PATTERN_LENGTH = 200
+_MAX_REGEX_GROUPS = 20
+
+
+def _is_unsafe_regex_pattern(pattern: str) -> bool:
+    if len(pattern) > _MAX_REGEX_PATTERN_LENGTH:
+        return True
+    if pattern.count("(") > _MAX_REGEX_GROUPS:
+        return True
+    return bool(_REDOS_SHAPE_RE.search(pattern))
+
+
 def detect_keywords(text: str, config: DetectionConfig) -> List[KeywordMatch]:
     """Find configured keyword / regex watermark matches."""
     findings: List[KeywordMatch] = []
@@ -125,6 +149,10 @@ def detect_keywords(text: str, config: DetectionConfig) -> List[KeywordMatch]:
     for kw in config.keywords:
         kw = kw.strip()
         if not kw:
+            continue
+        if config.use_regex and _is_unsafe_regex_pattern(kw):
+            # Looks like it could blow up catastrophically - skip rather
+            # than risk hanging the whole process for one bad pattern.
             continue
         try:
             pattern = kw if config.use_regex else re.escape(kw)

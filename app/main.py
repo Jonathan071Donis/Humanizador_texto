@@ -32,7 +32,7 @@ from . import session
 from .cleaner import clean_and_diff
 from .detector import run_detection
 from .extractors import ExtractionError, extract_content
-from .humanize import humanize_text_with_changes
+from .humanize import humanize_code_comments, humanize_text_with_changes
 from .models import (
     AIScoreResult,
     BatchFileResult,
@@ -40,8 +40,11 @@ from .models import (
     CleanResult,
     DetectionConfig,
     DetectionResult,
+    HumanizeCodeRequest,
+    HumanizeCodeResponse,
     HumanizeRequest,
     HumanizeResponse,
+    MAX_KEYWORDS,
     TextProcessRequest,
 )
 from .rate_limit import RateLimitMiddleware
@@ -52,23 +55,53 @@ logger = logging.getLogger("watermark-detector")
 APP_NAME = os.getenv("APP_NAME", "Watermark Detector")
 MAX_BATCH_FILES = int(os.getenv("MAX_BATCH_FILES", "20"))
 MAX_BATCH_TOTAL_MB = int(os.getenv("MAX_BATCH_TOTAL_MB", "50"))
+MAX_SINGLE_FILE_MB = int(os.getenv("MAX_SINGLE_FILE_MB", "20"))
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+_OPENAPI_TAGS = [
+    {"name": "Páginas", "description": "Vistas HTML públicas (sin login)."},
+    {"name": "Detección", "description": "Detección de marcas de agua invisibles y keywords/regex en texto o archivos."},
+    {"name": "Limpieza", "description": "Elimina las marcas detectadas y genera un diff antes/después."},
+    {"name": "Humanización de texto", "description": "Reescritura de estilo opcional y transparente (ver README)."},
+    {"name": "Humanización de código", "description": "Reescribe solo comentarios de código, nunca la lógica."},
+    {"name": "Lote (batch)", "description": "Procesa varios archivos a la vez y descarga un ZIP limpio."},
+]
 
 app = FastAPI(
     title=APP_NAME,
     description="Detección y eliminación de marcas de agua en texto, código, PDF y Word — en tiempo real, sin base de datos ni cuentas de usuario.",
     version="1.0.0",
+    openapi_tags=_OPENAPI_TAGS,
 )
 
 app.add_middleware(RateLimitMiddleware)
+
+# allow_credentials=True + allow_origins=["*"] is a well-known CORS
+# footgun: with credentials on, starlette must echo back the request's
+# Origin instead of "*", which in practice means "any site can make
+# credentialed requests" - only turn credentials on when the deployer has
+# actually locked CORS_ORIGINS down to specific origins.
+_cors_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
+_cors_allow_credentials = "*" not in _cors_origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=_cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def _security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    return response
+
 
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
@@ -103,17 +136,17 @@ def _build_detection_result(filename: str, text: str, config: DetectionConfig, f
 # Public pages (no login required - the whole app is public)
 # ---------------------------------------------------------------------------
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/", response_class=HTMLResponse, tags=["Páginas"])
 async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request, "app_name": APP_NAME})
 
 
-@app.get("/health")
+@app.get("/health", tags=["Páginas"], summary="Health check")
 async def health():
     return {"status": "ok", "time": time.time(), "sessions_in_memory": len(session.SESSION_HISTORY)}
 
 
-@app.get("/dashboard", response_class=HTMLResponse)
+@app.get("/dashboard", response_class=HTMLResponse, tags=["Páginas"])
 async def dashboard(request: Request, session_id: str = Depends(session.get_or_create_session_id)):
     history = session.get_history(session_id)
     return templates.TemplateResponse(
@@ -122,12 +155,12 @@ async def dashboard(request: Request, session_id: str = Depends(session.get_or_c
     )
 
 
-@app.get("/process", response_class=HTMLResponse)
+@app.get("/process", response_class=HTMLResponse, tags=["Páginas"])
 async def process_page(request: Request):
     return templates.TemplateResponse("process.html", {"request": request, "app_name": APP_NAME})
 
 
-@app.get("/batch", response_class=HTMLResponse)
+@app.get("/batch", response_class=HTMLResponse, tags=["Páginas"])
 async def batch_page(request: Request):
     return templates.TemplateResponse(
         "batch.html",
@@ -139,7 +172,7 @@ async def batch_page(request: Request):
 # Detection / cleaning API - all public, no login required
 # ---------------------------------------------------------------------------
 
-@app.post("/api/detect/text", response_model=DetectionResult)
+@app.post("/api/detect/text", response_model=DetectionResult, tags=["Detección"])
 async def detect_text(
     payload: TextProcessRequest,
     background_tasks: BackgroundTasks,
@@ -150,7 +183,7 @@ async def detect_text(
     return result
 
 
-@app.post("/api/detect/file", response_model=DetectionResult)
+@app.post("/api/detect/file", response_model=DetectionResult, tags=["Detección"])
 async def detect_file(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
@@ -161,8 +194,13 @@ async def detect_file(
     session_id: str = Depends(session.get_or_create_session_id),
 ):
     data = await file.read()
+    if len(data) > MAX_SINGLE_FILE_MB * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"El archivo supera el límite de {MAX_SINGLE_FILE_MB} MB",
+        )
     config = DetectionConfig(
-        keywords=[k for k in keywords.split(",") if k.strip()],
+        keywords=[k for k in keywords.split(",") if k.strip()][:MAX_KEYWORDS],
         use_regex=use_regex,
         case_sensitive=case_sensitive,
         detect_invisible_unicode=detect_invisible_unicode,
@@ -177,7 +215,7 @@ async def detect_file(
     return result
 
 
-@app.post("/api/clean", response_model=CleanResult)
+@app.post("/api/clean", response_model=CleanResult, tags=["Limpieza"])
 async def clean(payload: CleanRequest):
     return clean_and_diff(
         payload.content,
@@ -188,7 +226,7 @@ async def clean(payload: CleanRequest):
     )
 
 
-@app.post("/api/clean/download")
+@app.post("/api/clean/download", tags=["Limpieza"])
 async def clean_download(payload: CleanRequest):
     result = clean_and_diff(
         payload.content,
@@ -210,7 +248,7 @@ async def clean_download(payload: CleanRequest):
 # "Probabilidad de texto generado por IA" - heuristic, informational only
 # ---------------------------------------------------------------------------
 
-@app.post("/api/humanize", response_model=HumanizeResponse)
+@app.post("/api/humanize", response_model=HumanizeResponse, tags=["Humanización de texto"])
 async def humanize(payload: HumanizeRequest):
     if not payload.text.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El texto no puede estar vacío")
@@ -218,11 +256,21 @@ async def humanize(payload: HumanizeRequest):
     return HumanizeResponse(original=payload.text, humanized=humanized, changes=changes)
 
 
+@app.post("/api/humanize-code", response_model=HumanizeCodeResponse, tags=["Humanización de código"])
+async def humanize_code(payload: HumanizeCodeRequest):
+    if not payload.code.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El código no puede estar vacío")
+    humanized, changes, language = humanize_code_comments(
+        payload.code, payload.language, payload.intensity, payload.filename
+    )
+    return HumanizeCodeResponse(original=payload.code, humanized=humanized, changes=changes, language=language)
+
+
 # ---------------------------------------------------------------------------
 # Batch API - public, no login required
 # ---------------------------------------------------------------------------
 
-@app.post("/api/batch/detect")
+@app.post("/api/batch/detect", tags=["Lote (batch)"])
 async def batch_detect(
     background_tasks: BackgroundTasks,
     files: List[UploadFile] = File(...),
@@ -236,7 +284,7 @@ async def batch_detect(
         raise HTTPException(status_code=400, detail=f"Máximo {MAX_BATCH_FILES} archivos por lote")
 
     config = DetectionConfig(
-        keywords=[k for k in keywords.split(",") if k.strip()],
+        keywords=[k for k in keywords.split(",") if k.strip()][:MAX_KEYWORDS],
         use_regex=use_regex,
         case_sensitive=case_sensitive,
         detect_invisible_unicode=detect_invisible_unicode,
@@ -265,7 +313,7 @@ async def batch_detect(
     return {"results": results}
 
 
-@app.post("/api/batch/clean-zip")
+@app.post("/api/batch/clean-zip", tags=["Lote (batch)"])
 async def batch_clean_zip(
     files: List[UploadFile] = File(...),
     keywords: str = Form(""),
@@ -277,7 +325,7 @@ async def batch_clean_zip(
         raise HTTPException(status_code=400, detail=f"Máximo {MAX_BATCH_FILES} archivos por lote")
 
     config = DetectionConfig(
-        keywords=[k for k in keywords.split(",") if k.strip()],
+        keywords=[k for k in keywords.split(",") if k.strip()][:MAX_KEYWORDS],
         use_regex=use_regex,
         case_sensitive=case_sensitive,
         detect_invisible_unicode=detect_invisible_unicode,

@@ -27,13 +27,18 @@ ninguna funcionalidad.
   ver [más abajo](#indicador-de-probabilidad-de-texto-generado-por-ia).
 - **Humanización de texto** *(opcional, desactivada por defecto)*: ver
   [más abajo](#humanización-de-texto-opcional).
+- **Humanización de comentarios de código** *(opcional)*: reescribe solo el
+  texto dentro de comentarios (`#`, `//`, `/* */`, `<!-- -->`) en ~18
+  lenguajes, sin tocar nunca la lógica/nombres/estructura del código — ver
+  [más abajo](#humanización-de-comentarios-de-código-opcional).
 - **Sin base de datos**: no hay usuarios ni sesiones autenticadas; el
   historial que ves en `/dashboard` se guarda en memoria del proceso,
   asociado a una cookie anónima de navegador (no a una cuenta). Todo el
   procesamiento de archivos ocurre en memoria (`io.BytesIO`), nunca en
   disco.
 - Rate limiting simple (10 peticiones/min por IP), CORS, health check en
-  `/health`, documentación automática en `/docs`.
+  `/health`, documentación automática en `/docs`. Ver
+  [Seguridad](#seguridad) para el detalle completo.
 
 ## Ejecutar en local
 
@@ -123,11 +128,69 @@ Límites por diseño (ver [`app/humanize.py`](app/humanize.py)):
   más sustituciones y reestructuración, siempre dentro de los límites
   anteriores.
 
+## Humanización de comentarios de código (opcional)
+
+`POST /api/humanize-code` (con panel propio en `/process`, debajo del
+análisis principal) reescribe **solo** el texto dentro de comentarios de
+código — nunca las líneas de código, strings, nombres o estructura, que
+quedan carácter por carácter idénticas.
+
+- Detecta el lenguaje automáticamente (por extensión de archivo o por
+  heurísticas del contenido) o se puede forzar explícitamente. Soporta
+  Python, JS/TS, Java, C/C++/C#, Go, PHP, Rust, Swift, Kotlin, Ruby,
+  Shell, SQL, HTML/XML, CSS y YAML.
+- Localiza comentarios con un escáner consciente de strings (rastrea
+  comillas simples/dobles/backtick) para no confundir un `#` o `//` que
+  aparece dentro de un string con un comentario real.
+- Reescribe el *tono* del comentario (quita/reformula clichés de IA,
+  ablanda aperturas formales tipo "esta función se encarga de", quita
+  puntuación/capitalización excesiva) reutilizando la misma lógica
+  determinista que `humanize_text_with_changes`.
+- Igual que la humanización de texto: **no es una herramienta de evasión
+  de detectores**, es transparente (siempre se puede comparar contra el
+  original) y ante cualquier ambigüedad (p. ej. un comentario dentro de un
+  string multilínea que el escáner no rastrea) prefiere no tocar nada
+  antes que arriesgar romper una línea.
+
+## Seguridad
+
+Es una app pública y sin autenticación por diseño, así que las
+mitigaciones se centran en acotar el peor caso por request en vez de
+controlar "quién" pide qué:
+
+- **Límites de tamaño en cada request** (`app/models.py`): texto/código de
+  entrada, nombre de archivo, cantidad y longitud de keywords — todo tiene
+  un `max_length` explícito (422 si se excede), para que un payload gigante
+  no pueda acaparar CPU/memoria del proceso.
+- **Límite de subida de archivos**: `MAX_SINGLE_FILE_MB` (20 MB por
+  defecto) en `/api/detect/file`, además del límite ya existente de
+  `MAX_BATCH_TOTAL_MB` en los endpoints de lote.
+- **Mitigación de ReDoS en `use_regex`**: cualquier visitante puede activar
+  "usar expresión regular" en la detección de keywords, lo que en teoría
+  permite subir un patrón con backtracking catastrófico (`(a+)+$` y
+  similares) y colgar el proceso para *todo el mundo*, no solo para quien
+  lo envía. `app/detector.py` aplica una heurística (`_is_unsafe_regex_pattern`)
+  que descarta patrones con formas conocidas de blow-up exponencial antes
+  de compilarlos — no es un analizador de regex completo, pero bloquea los
+  casos comunes/ingenuos.
+- **CORS sin combinar wildcard + credenciales**: `allow_credentials=True`
+  junto con `allow_origins=["*"]` es una combinación insegura conocida (el
+  navegador termina permitiendo requests autenticadas desde cualquier
+  origen). Ahora `allow_credentials` solo se activa cuando `CORS_ORIGINS`
+  está fijado a orígenes concretos (no `*`).
+- **Cabeceras de seguridad** en todas las respuestas: `X-Content-Type-Options:
+  nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`,
+  `Permissions-Policy` restrictiva.
+- **Rate limiting** (`app/rate_limit.py`): 10 peticiones/min por IP,
+  configurable vía `RATE_LIMIT_PER_MINUTE`, aplica a toda la API.
+
 ## Notas importantes
 
 - **Sin base de datos ni cuentas**: reiniciar el servidor borra todo el
   historial de sesión — es intencional (modo desarrollo/demo).
-- En producción, define `CORS_ORIGINS` según corresponda.
+- En producción, define `CORS_ORIGINS` según corresponda (orígenes
+  concretos, separados por coma, si necesitas cookies/credenciales
+  cross-origin).
 
 ## Estructura del proyecto
 
@@ -144,7 +207,7 @@ app/
   rate_limit.py            Middleware de rate limiting en memoria
   templates/                Jinja2 + Bootstrap 5 (index, dashboard, process, batch)
   static/css/style.css       Tema oscuro personalizado
-  static/js/                  Lógica de front (análisis individual, batch)
+  static/js/                  Lógica de front (análisis individual, batch, humanizar código)
 tests/
   test_detector.py     Pruebas unitarias (detección y limpieza)
   test_ai_score.py       Pruebas del indicador heurístico de IA

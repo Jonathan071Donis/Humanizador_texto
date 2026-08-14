@@ -4,8 +4,19 @@ pure in-memory / wire-format schemas.
 """
 from __future__ import annotations
 
-from typing import List, Literal, Optional
+from typing import Annotated, List, Literal, Optional
 from pydantic import BaseModel, Field
+
+# Public, unauthenticated, single-process app - these caps exist purely to
+# bound worst-case CPU/memory per request (see rate_limit.py for the
+# per-IP request-rate side of the same concern). Generous enough for real
+# documents/snippets, tight enough that nobody can wedge the process with a
+# multi-megabyte payload.
+MAX_TEXT_LENGTH = 200_000
+MAX_CODE_LENGTH = 100_000
+MAX_FILENAME_LENGTH = 255
+MAX_KEYWORD_LENGTH = 300
+MAX_KEYWORDS = 100
 
 
 # ---------------------------------------------------------------------------
@@ -13,15 +24,17 @@ from pydantic import BaseModel, Field
 # ---------------------------------------------------------------------------
 
 class DetectionConfig(BaseModel):
-    keywords: List[str] = Field(default_factory=list)
+    keywords: List[Annotated[str, Field(max_length=MAX_KEYWORD_LENGTH)]] = Field(
+        default_factory=list, max_length=MAX_KEYWORDS
+    )
     use_regex: bool = False
     case_sensitive: bool = False
     detect_invisible_unicode: bool = True
 
 
 class TextProcessRequest(BaseModel):
-    content: str
-    filename: str = "pasted_text.txt"
+    content: str = Field(..., max_length=MAX_TEXT_LENGTH)
+    filename: str = Field("pasted_text.txt", max_length=MAX_FILENAME_LENGTH)
     config: DetectionConfig = Field(default_factory=DetectionConfig)
 
 
@@ -72,8 +85,8 @@ class DetectionResult(BaseModel):
 
 
 class CleanRequest(BaseModel):
-    content: str
-    filename: str = "pasted_text.txt"
+    content: str = Field(..., max_length=MAX_TEXT_LENGTH)
+    filename: str = Field("pasted_text.txt", max_length=MAX_FILENAME_LENGTH)
     config: DetectionConfig = Field(default_factory=DetectionConfig)
     remove_invisible_ids: Optional[List[str]] = None   # None = remove all found
     remove_keyword_ids: Optional[List[str]] = None     # None = remove all found
@@ -101,7 +114,7 @@ class BatchFileResult(BaseModel):
 # ---------------------------------------------------------------------------
 
 class HumanizeRequest(BaseModel):
-    text: str = Field(..., min_length=1)
+    text: str = Field(..., min_length=1, max_length=MAX_TEXT_LENGTH)
     intensity: Literal["low", "medium", "high"] = "medium"
 
 
@@ -109,3 +122,17 @@ class HumanizeResponse(BaseModel):
     original: str
     humanized: str
     changes: List[str]
+
+
+class HumanizeCodeRequest(BaseModel):
+    code: str = Field(..., min_length=1, max_length=MAX_CODE_LENGTH)
+    language: str = Field("auto", max_length=32)
+    filename: Optional[str] = Field(None, max_length=MAX_FILENAME_LENGTH)
+    intensity: Literal["low", "medium", "high"] = "medium"
+
+
+class HumanizeCodeResponse(BaseModel):
+    original: str
+    humanized: str
+    changes: List[str]
+    language: str

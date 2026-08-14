@@ -172,8 +172,70 @@
       </div>
     </div>
   </div>
+
+  <div class="row g-4 mt-1">
+    <div class="col-12">
+      <div class="wm-panel">
+        <div class="wm-panel-header">
+          <span class="wm-panel-icon wm-panel-icon-teal"><i class="bi bi-code-slash"></i></span>
+          <h2 class="wm-panel-title">Humanizar comentarios de c&oacute;digo</h2>
+        </div>
+        <div class="wm-disclaimer mb-3">
+          <i class="bi bi-info-circle"></i>
+          <span>Reescribe &uacute;nicamente el texto dentro de los comentarios para que suene a anotaciones r&aacute;pidas de un desarrollador. La l&oacute;gica, los nombres, la arquitectura y el c&oacute;digo en s&iacute; nunca se tocan &mdash; s&oacute;lo lo que est&aacute; despu&eacute;s de <code>#</code>, <code>//</code>, dentro de <code>/* */</code>, etc.</span>
+        </div>
+        <div class="row g-3">
+          <div class="col-lg-6">
+            <label class="form-label wm-muted small" for="codeInput">C&oacute;digo</label>
+            <textarea id="codeInput" class="form-control wm-input wm-mono" rows="12" placeholder="Pega aqu&iacute; tu snippet de c&oacute;digo..."></textarea>
+            <div class="d-flex flex-wrap gap-2 align-items-center mt-2">
+              <select id="codeLanguage" class="form-select form-select-sm wm-input" style="max-width:160px">
+                <option value="auto" selected>Detectar autom&aacute;ticamente</option>
+                <option value="python">Python</option>
+                <option value="javascript">JavaScript</option>
+                <option value="typescript">TypeScript</option>
+                <option value="java">Java</option>
+                <option value="c">C</option>
+                <option value="cpp">C++</option>
+                <option value="csharp">C#</option>
+                <option value="go">Go</option>
+                <option value="php">PHP</option>
+                <option value="rust">Rust</option>
+                <option value="swift">Swift</option>
+                <option value="kotlin">Kotlin</option>
+                <option value="ruby">Ruby</option>
+                <option value="shell">Shell</option>
+                <option value="sql">SQL</option>
+                <option value="html">HTML</option>
+                <option value="xml">XML</option>
+                <option value="css">CSS</option>
+                <option value="yaml">YAML</option>
+              </select>
+              <select id="codeIntensity" class="form-select form-select-sm wm-input" style="max-width:140px">
+                <option value="low">Intensidad baja</option>
+                <option value="medium" selected>Intensidad media</option>
+                <option value="high">Intensidad alta</option>
+              </select>
+              <button id="btnHumanizeCode" class="btn wm-btn-accent btn-sm d-flex align-items-center gap-2">
+                <span id="btnHumanizeCodeSpinner" class="spinner-border wm-spinner d-none" role="status" aria-hidden="true"></span>
+                <span id="btnHumanizeCodeLabel"><i class="bi bi-magic me-1"></i>Humanizar comentarios</span>
+              </button>
+            </div>
+            <div id="codeHumanizeError" class="wm-alert-error d-none mt-3"></div>
+          </div>
+          <div class="col-lg-6">
+            <label class="form-label wm-muted small">Resultado <span id="codeDetectedLang" class="wm-tag wm-tag-clean d-none"></span></label>
+            <pre id="codeResult" class="wm-diff-preview wm-mono" style="min-height:280px">El resultado aparecer&aacute; aqu&iacute;.</pre>
+            <ul id="codeChanges" class="wm-changes-list"></ul>
+            <button id="btnCopyCode" class="btn wm-btn-outline btn-sm mt-2"><i class="bi bi-clipboard-check me-1"></i>Copiar c&oacute;digo humanizado</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </section>
 {% endblock %}
 {% block scripts %}
 <script src="/static/js/process.js"></script>
+<script src="/static/js/code-humanize.js"></script>
 {% endblock %}
