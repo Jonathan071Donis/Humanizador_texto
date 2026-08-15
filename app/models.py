@@ -122,6 +122,8 @@ class HumanizeResponse(BaseModel):
     original: str
     humanized: str
     changes: List[str]
+    score_before: Optional[AIScoreResult] = None
+    score_after: Optional[AIScoreResult] = None
 
 
 class HumanizeCodeRequest(BaseModel):

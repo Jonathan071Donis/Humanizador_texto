@@ -44,6 +44,7 @@
   const humanizeOriginal = document.getElementById('humanizeOriginal');
   const humanizeResult = document.getElementById('humanizeResult');
   const humanizeChanges = document.getElementById('humanizeChanges');
+  const humanizeScoreCompare = document.getElementById('humanizeScoreCompare');
   const btnCopyHumanized = document.getElementById('btnCopyHumanized');
 
   let activeTab = 'paste';
@@ -194,15 +195,31 @@
     });
   }
 
+  function riskClassFor(score) {
+    if (score >= 65) return 'wm-risk-high';
+    if (score >= 35) return 'wm-risk-mid';
+    return 'wm-risk-low';
+  }
+
+  function setRiskClass(el, score) {
+    el.classList.remove('wm-risk-low', 'wm-risk-mid', 'wm-risk-high');
+    el.classList.add(riskClassFor(score));
+  }
+
   function renderAiScore(aiScore) {
     if (!aiScore) {
       aiScoreValue.textContent = '—';
+      aiScoreValue.classList.remove('wm-risk-low', 'wm-risk-mid', 'wm-risk-high');
       aiScoreMeter.style.width = '0%';
+      aiScoreMeter.classList.remove('wm-risk-low', 'wm-risk-mid', 'wm-risk-high');
       aiScoreSignals.innerHTML = '';
       return;
     }
+    const score = Math.min(100, Math.max(0, aiScore.score));
     aiScoreValue.textContent = `${aiScore.score}%`;
-    aiScoreMeter.style.width = `${Math.min(100, Math.max(0, aiScore.score))}%`;
+    aiScoreMeter.style.width = `${score}%`;
+    setRiskClass(aiScoreValue, score);
+    setRiskClass(aiScoreMeter, score);
     aiScoreSignals.innerHTML = '';
     aiScore.signals.forEach((signal) => {
       const li = document.createElement('li');
@@ -252,6 +269,25 @@
     diffPreview.innerHTML = result.diff_html || '<span class="wm-muted">Sin cambios.</span>';
   }
 
+  function renderScoreCompare(before, after) {
+    if (!before || !after) {
+      humanizeScoreCompare.innerHTML = '';
+      return;
+    }
+    const delta = Math.round((after.score - before.score) * 10) / 10;
+    let deltaClass = 'wm-delta-flat';
+    let deltaLabel = 'sin cambio';
+    if (delta < 0) { deltaClass = 'wm-delta-down'; deltaLabel = `${delta}%`; }
+    else if (delta > 0) { deltaClass = 'wm-delta-up'; deltaLabel = `+${delta}%`; }
+    humanizeScoreCompare.innerHTML = `
+      <span class="wm-score-compare-label">Score de IA (nuestro heurístico local):</span>
+      <span class="wm-score-compare-value ${riskClassFor(before.score)}">${before.score}%</span>
+      <i class="bi bi-arrow-right wm-score-compare-arrow"></i>
+      <span class="wm-score-compare-value ${riskClassFor(after.score)}">${after.score}%</span>
+      <span class="wm-score-compare-delta ${deltaClass}">${deltaLabel}</span>
+    `;
+  }
+
   async function runHumanize() {
     if (!state.content.trim()) return;
     humanizeWrap.classList.add('d-none');
@@ -273,6 +309,7 @@
         li.innerHTML = `<i class="bi bi-arrow-right-short"></i><span>${escapeHtml(c)}</span>`;
         humanizeChanges.appendChild(li);
       });
+      renderScoreCompare(data.score_before, data.score_after);
       humanizeWrap.classList.remove('d-none');
     } catch (err) {
       humanizeToggle.checked = false;

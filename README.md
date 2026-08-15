@@ -212,6 +212,9 @@ tests/
   test_detector.py     Pruebas unitarias (detección y limpieza)
   test_ai_score.py       Pruebas del indicador heurístico de IA
   test_humanize.py         Pruebas de la humanización de texto
+  test_humanize_code.py      Pruebas de la humanización de comentarios de código
+  test_security.py             Pruebas de límites de tamaño, ReDoS, CORS y cabeceras
+  test_api.py                    Pruebas de integración de los endpoints (FastAPI TestClient)
 requirements.txt
 Dockerfile
 render.yaml

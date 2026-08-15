@@ -1,32 +1,67 @@
 :root {
-  --wm-bg: #0b1220;
-  --wm-bg-alt: #0e1729;
-  --wm-panel: #111c31;
-  --wm-panel-border: #23324d;
-  --wm-text: #e7ecf6;
-  --wm-muted: #8b98b8;
-  --wm-accent: #e3a83b;
-  --wm-accent-dark: #b9832a;
-  --wm-teal: #3fd6c8;
-  --wm-danger: #e8607a;
+  /* Neutral scale - slightly cooler and less saturated than the old navy,
+     reads as "product", not "terminal" */
+  --wm-bg: #0a0e1a;
+  --wm-bg-alt: #0f1524;
+  --wm-panel: #131a2b;
+  --wm-panel-alt: #171f34;
+  --wm-panel-border: #232d47;
+  --wm-panel-border-soft: #1b2338;
+  --wm-text: #eef1f8;
+  --wm-muted: #8992ac;
+  --wm-muted-soft: #5f6883;
+
+  /* Brand: indigo/blue primary (trust, product) + teal secondary (verified/
+     clean). Both cool tones read calmer and more "SaaS" than the old
+     amber, which visually doubled as a warning color everywhere it appeared. */
+  --wm-accent: #6d7bff;
+  --wm-accent-dark: #5563e6;
+  --wm-accent-rgb: 109, 123, 255;
+  --wm-teal: #2dd9c8;
+  --wm-teal-rgb: 45, 217, 200;
+  --wm-danger: #f3667e;
+  --wm-danger-rgb: 243, 102, 126;
+  --wm-warning: #e3a83b;
+  --wm-warning-rgb: 227, 168, 59;
+
   --wm-display-font: 'Space Grotesk', 'Segoe UI', sans-serif;
   --wm-body-font: 'Inter', 'Segoe UI', sans-serif;
   --wm-mono-font: 'JetBrains Mono', 'Fira Code', monospace;
+
+  --wm-shadow-sm: 0 4px 16px -8px rgba(0, 0, 0, 0.45);
+  --wm-shadow-md: 0 16px 40px -20px rgba(0, 0, 0, 0.55);
+  --wm-shadow-lg: 0 24px 70px -24px rgba(0, 0, 0, 0.65);
+  --wm-radius-sm: 8px;
+  --wm-radius-md: 12px;
+  --wm-radius-lg: 16px;
 }
+
+*, *::before, *::after { box-sizing: border-box; }
+html { overflow-x: hidden; }
 
 body {
   background-color: var(--wm-bg);
   color: var(--wm-text);
   font-family: var(--wm-body-font);
   background-image:
-    radial-gradient(circle at 15% 0%, rgba(227, 168, 59, 0.07), transparent 40%),
-    radial-gradient(circle at 85% 10%, rgba(63, 214, 200, 0.06), transparent 45%);
+    radial-gradient(circle at 12% 0%, rgba(var(--wm-accent-rgb), 0.08), transparent 42%),
+    radial-gradient(circle at 88% 8%, rgba(var(--wm-teal-rgb), 0.06), transparent 45%);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
 a { color: var(--wm-teal); text-decoration: none; transition: color 0.15s ease; }
 .wm-link { color: var(--wm-teal); text-decoration: underline; }
 .wm-muted { color: var(--wm-muted); }
 .wm-hr { border-color: var(--wm-panel-border); }
+
+/* Custom scrollbars - default browser bars look out of place on a
+   deliberately-styled dark UI */
+* { scrollbar-width: thin; scrollbar-color: var(--wm-panel-border) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: var(--wm-panel-border); border-radius: 999px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--wm-muted-soft); }
 
 /* Nav */
 .wm-nav {
@@ -46,18 +81,28 @@ a { color: var(--wm-teal); text-decoration: none; transition: color 0.15s ease; 
   transition: color 0.15s ease;
 }
 .wm-nav .nav-link:hover { color: var(--wm-text); }
+.wm-nav .nav-link.active { color: var(--wm-text); position: relative; }
+.wm-nav .nav-link.active::after {
+  content: '';
+  position: absolute;
+  left: 0.75rem; right: 0.75rem; bottom: -2px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--wm-accent);
+}
 
 /* Buttons */
-.btn { transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease; }
+.btn { transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease; }
 .btn:active { transform: translateY(1px); }
 .wm-btn-accent {
   background: var(--wm-accent);
   border: 1px solid var(--wm-accent);
-  color: #1a1206;
+  color: #f5f6ff;
   font-weight: 600;
+  box-shadow: 0 8px 24px -12px rgba(var(--wm-accent-rgb), 0.65);
 }
-.wm-btn-accent:hover { background: var(--wm-accent-dark); border-color: var(--wm-accent-dark); color: #1a1206; }
-.wm-btn-accent:disabled { opacity: 0.65; transform: none; }
+.wm-btn-accent:hover { background: var(--wm-accent-dark); border-color: var(--wm-accent-dark); color: #f5f6ff; box-shadow: 0 10px 28px -10px rgba(var(--wm-accent-rgb), 0.75); }
+.wm-btn-accent:disabled { opacity: 0.55; transform: none; box-shadow: none; }
 .wm-btn-outline {
   background: transparent;
   border: 1px solid var(--wm-panel-border);
@@ -132,8 +177,8 @@ a { color: var(--wm-teal); text-decoration: none; transition: color 0.15s ease; 
   gap: 0.3rem;
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
-.wm-tag-found { background: rgba(227, 168, 59, 0.15); color: var(--wm-accent); border: 1px solid rgba(227, 168, 59, 0.4); }
-.wm-tag-clean { background: rgba(63, 214, 200, 0.15); color: var(--wm-teal); border: 1px solid rgba(63, 214, 200, 0.4); }
+.wm-tag-found { background: rgba(var(--wm-warning-rgb), 0.15); color: var(--wm-warning); border: 1px solid rgba(var(--wm-warning-rgb), 0.4); }
+.wm-tag-clean { background: rgba(var(--wm-teal-rgb), 0.15); color: var(--wm-teal); border: 1px solid rgba(var(--wm-teal-rgb), 0.4); }
 .wm-tag-info { background: rgba(139, 152, 184, 0.15); color: var(--wm-muted); border: 1px solid var(--wm-panel-border); }
 
 /* Feature / action cards */
@@ -182,11 +227,11 @@ a { color: var(--wm-teal); text-decoration: none; transition: color 0.15s ease; 
   width: 2rem;
   height: 2rem;
   border-radius: 8px;
-  background: rgba(227, 168, 59, 0.12);
+  background: rgba(var(--wm-accent-rgb), 0.12);
   color: var(--wm-accent);
   flex-shrink: 0;
 }
-.wm-panel-icon.wm-panel-icon-teal { background: rgba(63, 214, 200, 0.12); color: var(--wm-teal); }
+.wm-panel-icon.wm-panel-icon-teal { background: rgba(var(--wm-teal-rgb), 0.12); color: var(--wm-teal); }
 .wm-panel-title { margin: 0; font-size: 1rem; font-weight: 600; }
 .wm-input {
   background: var(--wm-bg-alt) !important;
@@ -194,12 +239,12 @@ a { color: var(--wm-teal); text-decoration: none; transition: color 0.15s ease; 
   color: var(--wm-text) !important;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.wm-input:focus { border-color: var(--wm-teal) !important; box-shadow: 0 0 0 0.2rem rgba(63, 214, 200, 0.15) !important; }
+.wm-input:focus { border-color: var(--wm-teal) !important; box-shadow: 0 0 0 0.2rem rgba(var(--wm-teal-rgb), 0.15) !important; }
 .wm-mono { font-family: var(--wm-mono-font); font-size: 0.85rem; }
 .wm-tabs .nav-link { color: var(--wm-muted); border: none; border-bottom: 2px solid transparent; transition: color 0.15s ease, border-color 0.15s ease; }
 .wm-tabs .nav-link.active { color: var(--wm-teal); background: transparent; border-bottom-color: var(--wm-teal); }
 .form-check-input:checked { background-color: var(--wm-teal); border-color: var(--wm-teal); }
-.form-check-input:focus { border-color: var(--wm-teal); box-shadow: 0 0 0 0.2rem rgba(63, 214, 200, 0.15); }
+.form-check-input:focus { border-color: var(--wm-teal); box-shadow: 0 0 0 0.2rem rgba(var(--wm-teal-rgb), 0.15); }
 
 .wm-dropzone {
   border: 1.5px dashed var(--wm-panel-border);
@@ -208,11 +253,25 @@ a { color: var(--wm-teal); text-decoration: none; transition: color 0.15s ease; 
   text-align: center;
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
-.wm-dropzone.wm-drag-over { border-color: var(--wm-teal); background: rgba(63, 214, 200, 0.05); }
+.wm-dropzone.wm-drag-over { border-color: var(--wm-teal); background: rgba(var(--wm-teal-rgb), 0.05); }
+
+/* Native file-picker button - unstyled by default, stands out against the
+   dark theme otherwise */
+input[type="file"].wm-input::file-selector-button {
+  background: var(--wm-panel-alt);
+  border: 1px solid var(--wm-panel-border);
+  border-radius: 6px;
+  color: var(--wm-text);
+  padding: 0.35rem 0.8rem;
+  margin-right: 0.75rem;
+  font-size: 0.85rem;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+input[type="file"].wm-input::file-selector-button:hover { border-color: var(--wm-teal); color: var(--wm-teal); }
 
 .wm-alert-error {
-  background: rgba(232, 96, 122, 0.12);
-  border: 1px solid rgba(232, 96, 122, 0.4);
+  background: rgba(var(--wm-danger-rgb), 0.12);
+  border: 1px solid rgba(var(--wm-danger-rgb), 0.4);
   color: var(--wm-danger);
   border-radius: 8px;
   padding: 0.6rem 0.9rem;
@@ -245,8 +304,8 @@ a { color: var(--wm-teal); text-decoration: none; transition: color 0.15s ease; 
   word-break: break-word;
   font-size: 0.8rem;
 }
-.wm-removed { background: rgba(232, 96, 122, 0.25); color: var(--wm-danger); text-decoration: line-through; }
-.wm-added { background: rgba(63, 214, 200, 0.2); color: var(--wm-teal); }
+.wm-removed { background: rgba(var(--wm-danger-rgb), 0.25); color: var(--wm-danger); text-decoration: line-through; }
+.wm-added { background: rgba(var(--wm-teal-rgb), 0.2); color: var(--wm-teal); }
 
 /* Table */
 .wm-table-wrap { border: 1px solid var(--wm-panel-border); border-radius: 10px; overflow: hidden; }
@@ -298,14 +357,26 @@ a { color: var(--wm-teal); text-decoration: none; transition: color 0.15s ease; 
 .wm-meter-fill {
   height: 100%;
   border-radius: 999px;
-  transition: width 0.4s ease;
-  background: linear-gradient(90deg, var(--wm-teal), var(--wm-accent));
+  transition: width 0.4s ease, background-color 0.3s ease;
+  background: var(--wm-teal); /* default/low - JS adds a .wm-risk-* modifier as the score rises */
 }
 .wm-score-value {
   font-family: var(--wm-mono-font);
   font-size: 1.6rem;
   font-weight: 600;
+  color: var(--wm-teal);
+  transition: color 0.3s ease;
 }
+/* Risk-level coloring: teal (low) -> amber (mid) -> red (high). Split into
+   a background variant (the meter fill bar) and a text variant (score
+   numbers) - a single class that set both would paint a solid color block
+   behind any text element that used it, which isn't what we want there. */
+.wm-meter-fill.wm-risk-low { background-color: var(--wm-teal); }
+.wm-meter-fill.wm-risk-mid { background-color: var(--wm-warning); }
+.wm-meter-fill.wm-risk-high { background-color: var(--wm-danger); }
+.wm-score-value.wm-risk-low, .wm-score-compare-value.wm-risk-low { color: var(--wm-teal); }
+.wm-score-value.wm-risk-mid, .wm-score-compare-value.wm-risk-mid { color: var(--wm-warning); }
+.wm-score-value.wm-risk-high, .wm-score-compare-value.wm-risk-high { color: var(--wm-danger); }
 .wm-signals-list { list-style: none; padding: 0; margin: 0.75rem 0 0; display: flex; flex-direction: column; gap: 0.5rem; }
 .wm-signals-list li {
   font-size: 0.85rem;
@@ -343,9 +414,9 @@ a { color: var(--wm-teal); text-decoration: none; transition: color 0.15s ease; 
   margin-bottom: 0.5rem;
 }
 .wm-humanize-badge {
-  background: rgba(63, 214, 200, 0.15);
+  background: rgba(var(--wm-teal-rgb), 0.15);
   color: var(--wm-teal);
-  border: 1px solid rgba(63, 214, 200, 0.4);
+  border: 1px solid rgba(var(--wm-teal-rgb), 0.4);
   border-radius: 999px;
   padding: 0.15rem 0.55rem;
   font-size: 0.65rem;
@@ -366,6 +437,28 @@ a { color: var(--wm-teal); text-decoration: none; transition: color 0.15s ease; 
 .wm-changes-list { list-style: none; padding: 0; margin: 0.75rem 0 0; display: flex; flex-direction: column; gap: 0.4rem; }
 .wm-changes-list li { font-size: 0.8rem; color: var(--wm-muted); display: flex; gap: 0.45rem; }
 .wm-changes-list li i { color: var(--wm-teal); margin-top: 0.15rem; }
+
+/* Before/after AI-score comparison shown after humanizing */
+.wm-score-compare {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  background: var(--wm-bg-alt);
+  border: 1px solid var(--wm-panel-border);
+  border-radius: var(--wm-radius-sm);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  font-family: var(--wm-mono-font);
+  font-size: 0.85rem;
+}
+.wm-score-compare .wm-score-compare-label { color: var(--wm-muted); font-family: var(--wm-body-font); }
+.wm-score-compare .wm-score-compare-value { font-weight: 700; }
+.wm-score-compare .wm-score-compare-arrow { color: var(--wm-muted); }
+.wm-score-compare .wm-score-compare-delta { font-family: var(--wm-body-font); font-size: 0.78rem; padding: 0.1rem 0.5rem; border-radius: 999px; }
+.wm-score-compare .wm-score-compare-delta.wm-delta-down { background: rgba(var(--wm-teal-rgb), 0.15); color: var(--wm-teal); }
+.wm-score-compare .wm-score-compare-delta.wm-delta-up { background: rgba(var(--wm-danger-rgb), 0.15); color: var(--wm-danger); }
+.wm-score-compare .wm-score-compare-delta.wm-delta-flat { background: rgba(139, 152, 184, 0.15); color: var(--wm-muted); }
 
 /* Small screens: tighten up panel padding and section spacing */
 @media (max-width: 575px) {

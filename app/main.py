@@ -253,7 +253,15 @@ async def humanize(payload: HumanizeRequest):
     if not payload.text.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El texto no puede estar vacío")
     humanized, changes = humanize_text_with_changes(payload.text, payload.intensity)
-    return HumanizeResponse(original=payload.text, humanized=humanized, changes=changes)
+    before = ai_score_engine.score_text(payload.text)
+    after = ai_score_engine.score_text(humanized)
+    return HumanizeResponse(
+        original=payload.text,
+        humanized=humanized,
+        changes=changes,
+        score_before=AIScoreResult(score=before.score, signals=before.signals, disclaimer=before.disclaimer),
+        score_after=AIScoreResult(score=after.score, signals=after.signals, disclaimer=after.disclaimer),
+    )
 
 
 @app.post("/api/humanize-code", response_model=HumanizeCodeResponse, tags=["Humanización de código"])

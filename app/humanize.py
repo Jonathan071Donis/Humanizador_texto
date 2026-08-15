@@ -9,9 +9,9 @@ from typing import Dict, List, Optional, Tuple
 INTENSITIES = ("low", "medium", "high")
 
 _INTENSITY_PARAMS: Dict[str, Dict[str, float]] = {
-    "low":    {"synonym_p": 0.20, "connector_p": 0.12, "merge_p": 0.00, "split_p": 0.00, "passive_p": 0.00, "cliche_p": 0.70, "merge_threshold": 6, "split_threshold": 30},
-    "medium": {"synonym_p": 0.45, "connector_p": 0.28, "merge_p": 0.18, "split_p": 0.10, "passive_p": 0.35, "cliche_p": 0.88, "merge_threshold": 7, "split_threshold": 26},
-    "high":   {"synonym_p": 0.70, "connector_p": 0.42, "merge_p": 0.34, "split_p": 0.26, "passive_p": 0.55, "cliche_p": 0.98, "merge_threshold": 9, "split_threshold": 20},
+    "low":    {"synonym_p": 0.20, "merge_p": 0.00, "split_p": 0.00, "passive_p": 0.00, "cliche_p": 0.70, "merge_threshold": 6, "split_threshold": 30},
+    "medium": {"synonym_p": 0.45, "merge_p": 0.18, "split_p": 0.10, "passive_p": 0.35, "cliche_p": 0.88, "merge_threshold": 7, "split_threshold": 26},
+    "high":   {"synonym_p": 0.70, "merge_p": 0.34, "split_p": 0.26, "passive_p": 0.55, "cliche_p": 0.98, "merge_threshold": 9, "split_threshold": 20},
 }
 
 # Small, static, curated synonym list. Keys are matched case-insensitively
@@ -30,10 +30,10 @@ SYNONYMS: Dict[str, List[str]] = {
     "aumentar": ["incrementar", "elevar"],
     "reducir": ["disminuir", "recortar"],
     "importante": ["relevante", "clave"],
-    "fácil": ["sencillo", "simple"],
+    "fácil": ["simple"],  # "sencillo/sencilla" varies by gender and we can't detect the noun it modifies - stick to invariant options
     "rápido": ["veloz", "ágil"],
-    "grande": ["amplio", "considerable"],
-    "problema": ["inconveniente", "dificultad"],
+    "grande": ["considerable", "enorme"],  # "amplio/amplia" is gendered - same reasoning as above
+    "problema": ["inconveniente", "contratiempo"],  # "dificultad" is feminine, "problema" is masculine despite the -a ending
     "resultado": ["hallazgo", "desenlace"],
     "también": ["asimismo", "igualmente"],
     "además": ["asimismo", "por añadidura"],
@@ -65,7 +65,7 @@ CLICHE_PHRASES: Dict[str, List[Optional[str]]] = {
     "cabe resaltar": ["hay que resaltar", "conviene resaltar"],
     "no cabe duda de que": ["está claro que", "sin duda,"],
     "es fundamental": ["es clave", "pesa muchísimo", "resulta clave"],
-    "es crucial": ["es clave", "pesa muchísimo", "resulta decisivo"],
+    "es crucial": ["es clave", "pesa muchísimo", "es determinante"],  # "decisivo/decisiva" varies by gender - avoid it here too
     "resulta crucial": ["resulta clave", "pesa muchísimo"],
     "juega un papel crucial": ["pesa muchísimo", "es clave"],
     "juega un papel fundamental": ["es clave", "pesa muchísimo"],
@@ -87,17 +87,6 @@ CLICHE_PHRASES: Dict[str, List[Optional[str]]] = {
     "en un mundo cada vez más": ["en un momento cada vez más", "hoy en día, cada vez más"],
 }
 
-
-# Natural filler/connector phrases inserted between sentences (medium/high
-# intensity mostly). Kept short and comma-friendly on purpose.
-CONNECTORS: List[str] = [
-    "de hecho",
-    "en realidad",
-    "básicamente",
-    "por cierto",
-    "eso sí",
-    "en el fondo",
-]
 
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 _WORD_RE = re.compile(r"[^\W\d_]+(?:'[^\W\d_]+)?", re.UNICODE)
@@ -205,17 +194,6 @@ def _apply_cliches(sentence: str, rng: random.Random, prob: float) -> Tuple[str,
     return new_sentence, applied
 
 
-def _maybe_insert_connector(sentence: str, rng: random.Random, prob: float, is_first: bool) -> Tuple[str, bool]:
-    if is_first or not sentence:
-        return sentence, False
-    if rng.random() > prob:
-        return sentence, False
-    connector = rng.choice(CONNECTORS)
-    first_char, rest = sentence[0], sentence[1:]
-    lowered_first = first_char.lower() if first_char.isupper() else first_char
-    return f"{connector.capitalize()}, {lowered_first}{rest}", True
-
-
 def _participle_to_finite_verb(participle: str, plural: bool):
     """Conjugate a regular participle into the preterite that agrees with
     `plural` (the NEW subject's number - the former agent - not the
@@ -271,59 +249,120 @@ def _maybe_passive_to_active(sentence: str, rng: random.Random, prob: float) -> 
     return new_sentence, True
 
 
+def _merge_pair(current: str, nxt: str, rng: random.Random) -> str:
+    current_stripped = current.rstrip()
+    body = current_stripped[:-1] if current_stripped and current_stripped[-1] in ".!?" else current_stripped
+    nxt_stripped = nxt.strip()
+    nxt_body = (nxt_stripped[:1].lower() + nxt_stripped[1:]) if nxt_stripped else nxt_stripped
+    # vary the joiner instead of always using a comma - a page full of
+    # comma-spliced merges is its own kind of uniform/robotic pattern
+    roll = rng.random()
+    joiner = "; " if roll < 0.20 else (" y " if roll < 0.35 else ", ")
+    return f"{body}{joiner}{nxt_body}"
+
+
 def _maybe_merge_sentences(sentences: List[str], rng: random.Random, prob: float, word_threshold: int = 7) -> Tuple[List[str], bool]:
+    """Merge some adjacent short-sentence pairs. Picks a target *count* up
+    front (rounded from prob * how many pairs qualify) instead of an
+    independent coin flip per pair - a paragraph with only one or two short
+    pairs would otherwise very often get zero merges even at "high"
+    intensity, since a single 30% flip missing is the common case, not the
+    exception."""
     if prob <= 0 or len(sentences) < 2:
         return sentences, False
+
+    eligible = [
+        i for i in range(len(sentences) - 1)
+        if _word_count(sentences[i]) <= word_threshold and _word_count(sentences[i + 1]) <= word_threshold
+    ]
+    if not eligible:
+        return sentences, False
+    target_n = max(1, round(len(eligible) * prob))
+    chosen = set(rng.sample(eligible, min(target_n, len(eligible))))
+
     result: List[str] = []
     applied = False
     i = 0
     while i < len(sentences):
-        current = sentences[i]
-        if i + 1 < len(sentences) and _word_count(current) <= word_threshold and _word_count(sentences[i + 1]) <= word_threshold and rng.random() < prob:
-            nxt = sentences[i + 1]
-            current_stripped = current.rstrip()
-            body = current_stripped[:-1] if current_stripped and current_stripped[-1] in ".!?" else current_stripped
-            nxt_stripped = nxt.strip()
-            nxt_body = (nxt_stripped[:1].lower() + nxt_stripped[1:]) if nxt_stripped else nxt_stripped
-            # vary the joiner instead of always using a comma - a page full of
-            # comma-spliced merges is its own kind of uniform/robotic pattern
-            roll = rng.random()
-            joiner = "; " if roll < 0.20 else (" y " if roll < 0.35 else ", ")
-            result.append(f"{body}{joiner}{nxt_body}")
+        if i in chosen and i + 1 < len(sentences):
+            result.append(_merge_pair(sentences[i], sentences[i + 1], rng))
             applied = True
             i += 2
         else:
-            result.append(current)
+            result.append(sentences[i])
             i += 1
     return result, applied
 
 
+# Splitting right before one of these stitches together a comma that was
+# holding up a dependent/correlative clause ("no X, sino Y", "el libro que
+# leiste", "lo hizo porque..."). Cutting there doesn't just sound informal,
+# it leaves the second half ungrammatical on its own - never split here.
+_SPLIT_STOPWORDS = {
+    "que", "sino", "porque", "aunque", "mientras", "cuando", "donde",
+    "quien", "quienes", "cual", "cuales", "como", "según", "pues", "si",
+    "ya", "cuyo", "cuya", "cuyos", "cuyas",
+}
+# A comma right before one of these reads like a real sentence break a
+# person would choose (coordinating conjunction / contrast) - prefer these
+# over an arbitrary mid-clause comma when there's more than one candidate.
+_SPLIT_PREFERRED_STARTERS = {"pero", "y", "o", "además", "así", "eso"}
+_WORD_AFTER_RE = re.compile(r"\s*([^\W\d_]+)", re.UNICODE)
+
+
+def _split_sentence(s: str) -> Optional[Tuple[str, str]]:
+    mid = len(s) // 2
+    safe: List[Tuple[int, bool]] = []  # (position, is_preferred)
+    for m in re.finditer(",", s):
+        pos = m.start()
+        nxt_match = _WORD_AFTER_RE.match(s[pos + 1:])
+        nxt = nxt_match.group(1).lower() if nxt_match else ""
+        if nxt in _SPLIT_STOPWORDS:
+            continue
+        safe.append((pos, nxt in _SPLIT_PREFERRED_STARTERS))
+    if not safe:
+        return None
+    preferred = [p for p in safe if p[1]]
+    pool = preferred if preferred else safe
+    split_at = min(pool, key=lambda p: abs(p[0] - mid))[0]
+    first = s[:split_at].rstrip().rstrip(",") + "."
+    second_raw = s[split_at + 1:].strip()
+    if not second_raw:
+        return None
+    second = second_raw[:1].upper() + second_raw[1:]
+    return first, second
+
+
 def _maybe_split_sentences(sentences: List[str], rng: random.Random, prob: float, long_threshold: int = 28) -> Tuple[List[str], bool]:
+    """Same "pick a target count, not a per-sentence coin flip" logic as
+    _maybe_merge_sentences, and for the same reason: a paragraph with just
+    one long sentence should reliably get split at "high" intensity rather
+    than depending on a single lucky roll."""
     if prob <= 0:
         return sentences, False
+
+    eligible = [i for i, s in enumerate(sentences) if _word_count(s) > long_threshold and _split_sentence(s)]
+    if not eligible:
+        return sentences, False
+    target_n = max(1, round(len(eligible) * prob))
+    chosen = set(rng.sample(eligible, min(target_n, len(eligible))))
+
     result: List[str] = []
     applied = False
-    for s in sentences:
-        if _word_count(s) > long_threshold and rng.random() < prob:
-            mid = len(s) // 2
-            commas = [m.start() for m in re.finditer(",", s)]
-            if commas:
-                split_at = min(commas, key=lambda p: abs(p - mid))
-                first = s[:split_at].rstrip().rstrip(",") + "."
-                second_raw = s[split_at + 1:].strip()
-                if second_raw:
-                    second = second_raw[:1].upper() + second_raw[1:]
-                    result.append(first)
-                    result.append(second)
-                    applied = True
-                    continue
+    for i, s in enumerate(sentences):
+        if i in chosen:
+            split = _split_sentence(s)
+            if split:
+                result.extend(split)
+                applied = True
+                continue
         result.append(s)
     return result, applied
 
 
 def _generate(text: str, seed: int, params: Dict[str, float]) -> Tuple[str, Dict[str, bool]]:
     rng = random.Random(seed)
-    applied = {"cliche": False, "synonym": False, "connector": False, "merge": False, "split": False, "passive": False}
+    applied = {"cliche": False, "synonym": False, "merge": False, "split": False, "passive": False}
 
     paragraphs = re.split(r"\n\s*\n+", text)
     out_paragraphs: List[str] = []
@@ -347,14 +386,12 @@ def _generate(text: str, seed: int, params: Dict[str, float]) -> Tuple[str, Dict
 
         sentences = [s for s in _SENTENCE_SPLIT_RE.split(paragraph.strip()) if s]
         transformed = []
-        for idx, sentence in enumerate(sentences):
+        for sentence in sentences:
             s, cli_applied = _apply_cliches(sentence, rng, params["cliche_p"])
             s, syn_applied = _apply_synonyms(s, rng, params["synonym_p"])
-            s, con_applied = _maybe_insert_connector(s, rng, params["connector_p"], is_first=(idx == 0))
             s, pas_applied = _maybe_passive_to_active(s, rng, params["passive_p"])
             applied["cliche"] = applied["cliche"] or cli_applied
             applied["synonym"] = applied["synonym"] or syn_applied
-            applied["connector"] = applied["connector"] or con_applied
             applied["passive"] = applied["passive"] or pas_applied
             transformed.append(s)
 
@@ -378,8 +415,6 @@ def _describe_changes(applied: Dict[str, bool], intensity: str) -> List[str]:
         changes.append("Se han quitado o reformulado frases hechas típicas de IA (p. ej. «es importante destacar», «en resumen», «es crucial»).")
     if applied.get("synonym"):
         changes.append("Se han sustituido algunas palabras por sinónimos equivalentes.")
-    if applied.get("connector"):
-        changes.append("Se han insertado conectores y muletillas naturales (p. ej. «de hecho», «básicamente»).")
     if applied.get("merge"):
         changes.append("Se han combinado oraciones cortas adyacentes para variar el ritmo.")
     if applied.get("split"):
@@ -410,10 +445,6 @@ def humanize_text_with_changes(text: str, intensity: str = "medium") -> Tuple[st
 
     params = dict(base_params)
     result_text, applied = _generate(text, seed, params)
-
-    if abs(len(result_text) - original_len) > budget:
-        params["connector_p"] = 0.0
-        result_text, applied = _generate(text, seed, params)
 
     if abs(len(result_text) - original_len) > budget:
         params["synonym_p"] = min(params["synonym_p"], 0.15)

@@ -139,6 +139,7 @@
             <span>Reescribe el texto con un estilo m&aacute;s natural y variado conservando significado, datos y estructura (&plusmn;10% de longitud). No est&aacute; dise&ntilde;ada para evadir detectores de IA ni de marcas de agua &mdash; el texto original se conserva siempre para comparar.</span>
           </div>
           <div id="humanizeWrap" class="d-none">
+            <div id="humanizeScoreCompare" class="wm-score-compare"></div>
             <div class="wm-humanize-columns">
               <div>
                 <div class="wm-humanize-col-title">Original</div>
@@ -189,8 +190,8 @@
             <label class="form-label wm-muted small" for="codeInput">C&oacute;digo</label>
             <textarea id="codeInput" class="form-control wm-input wm-mono" rows="12" placeholder="Pega aqu&iacute; tu snippet de c&oacute;digo..."></textarea>
             <div class="d-flex flex-wrap gap-2 align-items-center mt-2">
-              <select id="codeLanguage" class="form-select form-select-sm wm-input" style="max-width:160px">
-                <option value="auto" selected>Detectar autom&aacute;ticamente</option>
+              <select id="codeLanguage" class="form-select form-select-sm wm-input" style="min-width:120px; max-width:160px; flex:1 1 120px;">
+                <option value="auto" selected>Auto</option>
                 <option value="python">Python</option>
                 <option value="javascript">JavaScript</option>
                 <option value="typescript">TypeScript</option>
@@ -211,10 +212,10 @@
                 <option value="css">CSS</option>
                 <option value="yaml">YAML</option>
               </select>
-              <select id="codeIntensity" class="form-select form-select-sm wm-input" style="max-width:140px">
-                <option value="low">Intensidad baja</option>
-                <option value="medium" selected>Intensidad media</option>
-                <option value="high">Intensidad alta</option>
+              <select id="codeIntensity" class="form-select form-select-sm wm-input" style="min-width:90px; max-width:130px; flex:1 1 90px;">
+                <option value="low">Baja</option>
+                <option value="medium" selected>Media</option>
+                <option value="high">Alta</option>
               </select>
               <button id="btnHumanizeCode" class="btn wm-btn-accent btn-sm d-flex align-items-center gap-2">
                 <span id="btnHumanizeCodeSpinner" class="spinner-border wm-spinner d-none" role="status" aria-hidden="true"></span>
