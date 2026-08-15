@@ -366,28 +366,57 @@ _SPLIT_STOPWORDS = {
 _SPLIT_PREFERRED_STARTERS = {"pero", "y", "o", "además", "así", "eso"}
 _WORD_AFTER_RE = re.compile(r"\s*([^\W\d_]+)", re.UNICODE)
 
+# Fallback for sentences with no usable comma at all - common in clean,
+# comma-light writing (a lot of it AI-generated). "pero" and "mientras que"
+# always join two full clauses in Spanish, never a list of nouns like "y"
+# does ("manzanas y peras"), so cutting there never stands up a sentence
+# fragment the way a mid-list cut would.
+_COMMALESS_SPLIT_PHRASES = ("mientras que", "pero")
+
+
+# Never split so close to either end that a half reads as a fragment
+# ("En mi opinión." is 3 words and doesn't stand on its own as a sentence).
+_MIN_SPLIT_HALF_WORDS = 4
+
 
 def _split_sentence(s: str) -> Optional[Tuple[str, str]]:
     mid = len(s) // 2
     safe: List[Tuple[int, bool]] = []  # (position, is_preferred)
     for m in re.finditer(",", s):
         pos = m.start()
+        if _word_count(s[:pos]) < _MIN_SPLIT_HALF_WORDS or _word_count(s[pos + 1:]) < _MIN_SPLIT_HALF_WORDS:
+            continue
         nxt_match = _WORD_AFTER_RE.match(s[pos + 1:])
         nxt = nxt_match.group(1).lower() if nxt_match else ""
         if nxt in _SPLIT_STOPWORDS:
             continue
         safe.append((pos, nxt in _SPLIT_PREFERRED_STARTERS))
-    if not safe:
-        return None
-    preferred = [p for p in safe if p[1]]
-    pool = preferred if preferred else safe
-    split_at = min(pool, key=lambda p: abs(p[0] - mid))[0]
-    first = s[:split_at].rstrip().rstrip(",") + "."
-    second_raw = s[split_at + 1:].strip()
-    if not second_raw:
-        return None
-    second = second_raw[:1].upper() + second_raw[1:]
-    return first, second
+
+    if safe:
+        preferred = [p for p in safe if p[1]]
+        pool = preferred if preferred else safe
+        split_at = min(pool, key=lambda p: abs(p[0] - mid))[0]
+        first = s[:split_at].rstrip().rstrip(",") + "."
+        second_raw = s[split_at + 1:].strip()
+        if not second_raw:
+            return None
+        second = second_raw[:1].upper() + second_raw[1:]
+        return first, second
+
+    for phrase in _COMMALESS_SPLIT_PHRASES:
+        m = re.search(rf"\s{re.escape(phrase)}\s", s, re.IGNORECASE)
+        if not m:
+            continue
+        split_at = m.start()
+        if _word_count(s[:split_at]) < _MIN_SPLIT_HALF_WORDS or _word_count(s[split_at:]) < _MIN_SPLIT_HALF_WORDS:
+            continue
+        first = s[:split_at].rstrip() + "."
+        second_raw = s[split_at:].strip()
+        if not second_raw:
+            continue
+        second = second_raw[:1].upper() + second_raw[1:]
+        return first, second
+    return None
 
 
 def _maybe_split_sentences(sentences: List[str], rng: random.Random, prob: float, long_threshold: int = 28) -> Tuple[List[str], bool]:
