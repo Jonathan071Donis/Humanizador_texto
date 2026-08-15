@@ -9,9 +9,9 @@ from typing import Dict, List, Optional, Tuple
 INTENSITIES = ("low", "medium", "high")
 
 _INTENSITY_PARAMS: Dict[str, Dict[str, float]] = {
-    "low":    {"synonym_p": 0.20, "merge_p": 0.00, "split_p": 0.00, "passive_p": 0.00, "cliche_p": 0.70, "merge_threshold": 6, "split_threshold": 30},
-    "medium": {"synonym_p": 0.45, "merge_p": 0.18, "split_p": 0.10, "passive_p": 0.35, "cliche_p": 0.88, "merge_threshold": 7, "split_threshold": 26},
-    "high":   {"synonym_p": 0.70, "merge_p": 0.34, "split_p": 0.26, "passive_p": 0.55, "cliche_p": 0.98, "merge_threshold": 9, "split_threshold": 20},
+    "low":    {"synonym_p": 0.20, "merge_p": 0.00, "split_p": 0.00, "passive_p": 0.00, "cliche_p": 0.70, "merge_threshold": 6, "split_threshold": 30, "aside_p": 0.00},
+    "medium": {"synonym_p": 0.45, "merge_p": 0.18, "split_p": 0.10, "passive_p": 0.35, "cliche_p": 0.88, "merge_threshold": 7, "split_threshold": 26, "aside_p": 0.20},
+    "high":   {"synonym_p": 0.70, "merge_p": 0.34, "split_p": 0.40, "passive_p": 0.55, "cliche_p": 0.98, "merge_threshold": 9, "split_threshold": 15, "aside_p": 0.35},
 }
 
 # Small, static, curated synonym list. Keys are matched case-insensitively
@@ -42,7 +42,44 @@ SYNONYMS: Dict[str, List[str]] = {
     "finalmente": ["por último", "para terminar"],
     "actualmente": ["hoy en día", "en la actualidad"],
     "básicamente": ["esencialmente", "en esencia"],
+    # High-frequency words: swapping these moves the needle on perplexity far
+    # more than rare-word synonyms, because they show up in almost every
+    # sentence. Kept invariant/safe the same way as the rest of the dict.
+    "muy": ["súper", "bastante"],
+    "puede": ["es capaz de", "tiene la posibilidad de", "está en condiciones de"],
+    "bueno": ["genial", "fenomenal", "excelente"],
+    "malo": ["terrible", "lamentable"],
+    "quizás": ["tal vez", "a lo mejor"],
+    "porque": ["ya que", "puesto que"],
+    "entonces": ["así que", "por eso"],
+    "nuevo": ["reciente"],
+    "sencillo": ["simple"],
+    "posible": ["viable", "factible"],
+    "necesario": ["indispensable", "imprescindible"],
+    "significativo": ["considerable", "notable"],
+    "positivo": ["favorable"],
+    "negativo": ["desfavorable"],
+    "hacer": ["realizar", "efectuar"],
+    "tener": ["poseer", "contar con"],
+    "decir": ["expresar", "manifestar"],
+    "ver": ["observar", "notar"],
+    "encontrar": ["hallar", "localizar"],
+    "crear": ["producir", "diseñar"],
+    "ayudar": ["asistir", "apoyar"],
+    "lograr": ["conseguir", "alcanzar"],
 }
+
+# Conversational asides that sit at the start of a paragraph - the natural
+# spot for a personal voice, unlike the old per-sentence connector
+# insertion (removed - it dropped filler mid-sentence with no tie to the
+# content). Used sparingly and never on the first paragraph.
+PARAGRAPH_ASIDES: List[str] = [
+    "Mira,",
+    "A ver,",
+    "Honestamente,",
+    "Pensándolo bien,",
+    "Para ser sincero,",
+]
 
 # Stock phrases that read as "obviously AI-written" (the same family ai_score.py
 # flags). Matched as whole phrases, case-insensitively. A None option means
@@ -85,6 +122,26 @@ CLICHE_PHRASES: Dict[str, List[Optional[str]]] = {
     "por otro lado": ["por otra parte", "eso sí,", "en cambio,"],
     "no obstante": ["aun así", "con todo"],
     "en un mundo cada vez más": ["en un momento cada vez más", "hoy en día, cada vez más"],
+    "por lo tanto": ["así que", "por eso"],
+    "en el panorama actual": ["hoy en día", "tal como están las cosas"],
+    "es evidente que": ["está claro que", "se nota que", None],
+    "resulta evidente que": ["está claro que", None],
+    "cabe señalar que": ["hay que señalar que", None],
+    "en otras palabras": ["dicho de otro modo", "o sea"],
+    "de esta manera": ["así", "de este modo"],
+    "de esta forma": ["así", "de este modo"],
+    "con el fin de": ["para"],
+    "a través de": ["mediante", "por medio de"],
+    "en base a": ["según", "con base en"],
+    "de acuerdo con": ["según"],
+    "hay que tener en cuenta que": ["ten en cuenta que", "ojo que", None],
+    "es esencial": ["es clave", "hace falta"],
+    "de manera similar": ["de forma parecida", "igualmente"],
+    "por consiguiente": ["así que", "por eso"],
+    "en consecuencia": ["por eso", "así que"],
+    "desempeña un papel": ["cumple un papel", "tiene un papel"],
+    "desempeña un papel crucial": ["pesa muchísimo", "es clave"],
+    "desempeña un papel fundamental": ["es clave", "pesa muchísimo"],
 }
 
 
@@ -360,12 +417,22 @@ def _maybe_split_sentences(sentences: List[str], rng: random.Random, prob: float
     return result, applied
 
 
+def _maybe_add_paragraph_aside(paragraph_text: str, rng: random.Random, prob: float, is_first: bool) -> Tuple[str, bool]:
+    if is_first or not paragraph_text or prob <= 0 or rng.random() > prob:
+        return paragraph_text, False
+    aside = rng.choice(PARAGRAPH_ASIDES)
+    first_char, rest = paragraph_text[0], paragraph_text[1:]
+    lowered = first_char.lower() if first_char.isupper() else first_char
+    return f"{aside} {lowered}{rest}", True
+
+
 def _generate(text: str, seed: int, params: Dict[str, float]) -> Tuple[str, Dict[str, bool]]:
     rng = random.Random(seed)
-    applied = {"cliche": False, "synonym": False, "merge": False, "split": False, "passive": False}
+    applied = {"cliche": False, "synonym": False, "merge": False, "split": False, "passive": False, "aside": False}
 
     paragraphs = re.split(r"\n\s*\n+", text)
     out_paragraphs: List[str] = []
+    seen_paragraph_idx = 0
 
     for paragraph in paragraphs:
         if not paragraph.strip():
@@ -382,6 +449,7 @@ def _generate(text: str, seed: int, params: Dict[str, float]) -> Tuple[str, Dict
                 applied["synonym"] = applied["synonym"] or syn_applied
                 new_lines.append(new_line)
             out_paragraphs.append("\n".join(new_lines))
+            seen_paragraph_idx += 1
             continue
 
         sentences = [s for s in _SENTENCE_SPLIT_RE.split(paragraph.strip()) if s]
@@ -404,7 +472,13 @@ def _generate(text: str, seed: int, params: Dict[str, float]) -> Tuple[str, Dict
         )
         applied["split"] = applied["split"] or split_applied
 
-        out_paragraphs.append(" ".join(transformed))
+        joined = " ".join(transformed)
+        joined, aside_applied = _maybe_add_paragraph_aside(
+            joined, rng, params.get("aside_p", 0.0), is_first=(seen_paragraph_idx == 0)
+        )
+        applied["aside"] = applied["aside"] or aside_applied
+        seen_paragraph_idx += 1
+        out_paragraphs.append(joined)
 
     return "\n\n".join(out_paragraphs), applied
 
@@ -421,6 +495,8 @@ def _describe_changes(applied: Dict[str, bool], intensity: str) -> List[str]:
         changes.append("Se han dividido oraciones largas para mejorar la lectura.")
     if applied.get("passive"):
         changes.append("Se ha convertido alguna oración de voz pasiva a voz activa, solo cuando era gramaticalmente segura.")
+    if applied.get("aside"):
+        changes.append("Se ha agregado alguna acotación conversacional al inicio de un párrafo (p. ej. «Mira,», «Honestamente,»).")
     if not changes:
         changes.append("No se aplicaron cambios sustanciales para esta intensidad (texto ya variado o demasiado corto).")
     changes.append(

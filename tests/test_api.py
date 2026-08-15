@@ -84,8 +84,15 @@ def test_openapi_schema_is_served():
     assert "/api/humanize" in paths
 
 
-def test_process_page_includes_code_humanize_panel():
-    res = client.get("/process")
+def test_code_page_has_its_own_route():
+    res = client.get("/code")
     assert res.status_code == 200
     assert "codeInput" in res.text
     assert "code-humanize.js" in res.text
+
+
+def test_process_page_no_longer_bundles_code_humanize_panel():
+    res = client.get("/process")
+    assert res.status_code == 200
+    assert "codeInput" not in res.text
+    assert "code-humanize.js" not in res.text

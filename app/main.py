@@ -160,6 +160,11 @@ async def process_page(request: Request):
     return templates.TemplateResponse("process.html", {"request": request, "app_name": APP_NAME})
 
 
+@app.get("/code", response_class=HTMLResponse, tags=["Páginas"])
+async def code_page(request: Request):
+    return templates.TemplateResponse("code.html", {"request": request, "app_name": APP_NAME})
+
+
 @app.get("/batch", response_class=HTMLResponse, tags=["Páginas"])
 async def batch_page(request: Request):
     return templates.TemplateResponse(

@@ -42,6 +42,8 @@ DEFAULT_AI_CONNECTOR_PHRASES: List[str] = [
     "en un mundo cada vez más",
     "es crucial",
     "a la hora de",
+    "por lo tanto",
+    "en el panorama actual",
 ]
 
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")

@@ -130,10 +130,10 @@ Límites por diseño (ver [`app/humanize.py`](app/humanize.py)):
 
 ## Humanización de comentarios de código (opcional)
 
-`POST /api/humanize-code` (con panel propio en `/process`, debajo del
-análisis principal) reescribe **solo** el texto dentro de comentarios de
-código — nunca las líneas de código, strings, nombres o estructura, que
-quedan carácter por carácter idénticas.
+`POST /api/humanize-code` (con página propia en `/code`, separada del
+análisis de texto/archivo) reescribe **solo** el texto dentro de
+comentarios de código — nunca las líneas de código, strings, nombres o
+estructura, que quedan carácter por carácter idénticas.
 
 - Detecta el lenguaje automáticamente (por extensión de archivo o por
   heurísticas del contenido) o se puede forzar explícitamente. Soporta
@@ -205,7 +205,7 @@ app/
   humanize.py            Humanización de texto opcional (desactivada por defecto)
   models.py               Esquemas Pydantic
   rate_limit.py            Middleware de rate limiting en memoria
-  templates/                Jinja2 + Bootstrap 5 (index, dashboard, process, batch)
+  templates/                Jinja2 + Bootstrap 5 (index, dashboard, process, code, batch)
   static/css/style.css       Tema oscuro personalizado
   static/js/                  Lógica de front (análisis individual, batch, humanizar código)
 tests/
